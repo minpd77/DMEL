@@ -2,45 +2,64 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>빠른 지도 테스트</title>
+  <title>대명엘리베이터 고장신고 지도</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
   />
   <style>
-    #map { height: 600px; width: 100%; }
+    #map {
+      height: 600px;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
+  <h1>대명엘리베이터 고장신고 지도</h1>
   <div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
   <script>
     const map = L.map('map').setView([37.5665, 126.978], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
+    const CSV_URL =
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
 
     fetch(CSV_URL)
-      .then(res => res.text())
-      .then(csvText => {
-        const data = Papa.parse(csvText, {header:true}).data;
-        data.forEach(row => {
+      .then((res) => res.text())
+      .then((csvText) => {
+        const data = Papa.parse(csvText, { header: true }).data;
+        data.forEach((row) => {
           if (!row['T']) return;
-          const [lat, lng] = row['T'].split(',').map(Number);
+
+          const latLng = row['T'].split(',');
+          if (latLng.length !== 2) return;
+
+          const lat = parseFloat(latLng[0]);
+          const lng = parseFloat(latLng[1]);
           if (isNaN(lat) || isNaN(lng)) return;
 
-          L.marker([lat,lng])
+          L.marker([lat, lng])
             .addTo(map)
             .bindPopup(`
-              <b>현장명:</b> ${row['현장명'] || '-'}<br>
-              <b>신고내용:</b> ${row['G'] || '-'}
+              <b>현장명/신고내용:</b><br/>
+              ${row['G'] || '정보없음'}
             `);
         });
+      })
+      .catch((err) => {
+        console.error('CSV 로드 오류:', err);
       });
   </script>
 </body>
