@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>대명엘리베이터 고장신고 지도 (T열 좌표만)</title>
+  <title>대명엘리베이터 고장신고 지도 (T열 좌표만 표시)</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -19,10 +19,10 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
   <script>
-    // 지도 초기화 - 서울 중심 좌표, 줌 레벨 12
+    // 지도 초기화 (서울 중심, 줌12)
     const map = L.map('map').setView([37.5665, 126.978], 12);
 
-    // OSM 타일 추가
+    // OSM 타일 레이어 추가
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution:
@@ -45,6 +45,7 @@
       shadowSize: [41, 41],
     });
 
+    // CSV 읽고 파싱해서 마커 표시
     fetch(CSV_URL)
       .then((res) => res.text())
       .then((csvText) => {
@@ -52,7 +53,6 @@
         data.forEach((row) => {
           if (!row['T']) return;
 
-          // T열 좌표 값 분할 및 파싱
           const latLng = row['T'].split(',');
           if (latLng.length !== 2) return;
 
@@ -61,11 +61,10 @@
 
           if (isNaN(lat) || isNaN(lng)) return;
 
-          // 마커 추가
           L.marker([lat, lng], { icon: redIcon }).addTo(map);
         });
       })
-      .catch((err) => console.error('CSV load or parse error:', err));
+      .catch((err) => console.error('CSV 로드/파싱 에러:', err));
   </script>
 </body>
 </html>
