@@ -2,153 +2,46 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>대명엘리베이터 고장신고 지도 (위도경도 기반)</title>
+  <title>빠른 지도 테스트</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    crossorigin=""
   />
   <style>
-    #map {
-      height: 600px;
-      width: 100%;
-    }
-    #fault-list {
-      max-height: 300px;
-      overflow-y: auto;
-      margin-top: 10px;
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-    }
-    .fault-item {
-      padding: 5px;
-      border-bottom: 1px solid #ccc;
-    }
-    .resolved {
-      color: gray;
-    }
-    .unresolved {
-      color: black;
-      font-weight: bold;
-    }
-    .siren {
-      color: red;
-      margin-right: 5px;
-    }
+    #map { height: 600px; width: 100%; }
   </style>
 </head>
 <body>
-  <h1>대명엘리베이터 고장신고 지도</h1>
   <div id="map"></div>
-  <div id="fault-list"></div>
 
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    crossorigin=""
-  ></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
   <script>
-    // 지도 초기화 (서울 시청 기준)
     const map = L.map('map').setView([37.5665, 126.978], 12);
 
-    // OSM 타일 레이어 추가
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    // CSV URL
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
 
-    const markers = {};
-    const markerGroup = L.layerGroup().addTo(map);
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(csvText => {
+        const data = Papa.parse(csvText, {header:true}).data;
+        data.forEach(row => {
+          if (!row['T']) return;
+          const [lat, lng] = row['T'].split(',').map(Number);
+          if (isNaN(lat) || isNaN(lng)) return;
 
-    // 고장 리스트 DOM
-    const faultListDiv = document.getElementById('fault-list');
-
-    // 고장 상태 예시 (미해결: unresolved, 해결: resolved)
-    // 실제 값에 따라 맞춰서 바꾸세요
-    function isResolved(row) {
-      // 예: 해결 여부 판단 컬럼이 없으면 false로 간주 (모두 미해결)
-      return false;
-    }
-
-    function createMarker(row, idx) {
-      const latLngStr = row['T'];
-      if (!latLngStr) return null;
-
-      const parts = latLngStr.split(',');
-      if (parts.length !== 2) return null;
-
-      const lat = parseFloat(parts[0]);
-      const lng = parseFloat(parts[1]);
-      if (isNaN(lat) || isNaN(lng)) return null;
-
-      const marker = L.marker([lat, lng]);
-
-      const popupContent = `
-        <b>현장명:</b> ${row['현장명'] || '정보없음'}<br/>
-        <b>주소:</b> ${row['G'] || '정보없음'}<br/>
-        <b>신고내용:</b> ${row['G'] || '정보없음'}<br/>
-        <button onclick="resolveFault(${idx})">해결 완료</button>
-      `;
-      marker.bindPopup(popupContent);
-      marker.addTo(markerGroup);
-      return marker;
-    }
-
-    // 마커와 리스트 관리를 위한 배열
-    let faultData = [];
-    let faultMarkers = [];
-
-    // 해결 완료 처리 (임시 - 실제 서버 연동 필요)
-    window.resolveFault = function(idx) {
-      alert('해결 처리됨 (기능 구현 필요)');
-      // 예) markerGroup.removeLayer(faultMarkers[idx]);
-      // 그리고 리스트 업데이트 등 추가 작업 필요
-    };
-
-    function renderFaultList(data) {
-      faultListDiv.innerHTML = '';
-      data.forEach((row, idx) => {
-        const resolved = isResolved(row);
-        const div = document.createElement('div');
-        div.className = 'fault-item ' + (resolved ? 'resolved' : 'unresolved');
-        div.innerHTML = resolved
-          ? `${row['현장명'] || '정보없음'} - 해결자: ${row['해결자'] || ''}`
-          : `<span class="siren">🚨</span>${row['현장명'] || '정보없음'}`;
-        div.onclick = () => {
-          if (faultMarkers[idx]) {
-            map.setView(faultMarkers[idx].getLatLng(), 16);
-            faultMarkers[idx].openPopup();
-          }
-        };
-        faultListDiv.appendChild(div);
-      });
-    }
-
-    // CSV 로드 후 마커 생성, 리스트 표시
-    Papa.parse(CSV_URL, {
-      download: true,
-      header: true,
-      complete: function(results) {
-        faultData = results.data;
-        faultMarkers = [];
-
-        markerGroup.clearLayers();
-
-        faultData.forEach((row, idx) => {
-          const marker = createMarker(row, idx);
-          if (marker) faultMarkers.push(marker);
+          L.marker([lat,lng])
+            .addTo(map)
+            .bindPopup(`
+              <b>현장명:</b> ${row['현장명'] || '-'}<br>
+              <b>신고내용:</b> ${row['G'] || '-'}
+            `);
         });
-
-        renderFaultList(faultData);
-      },
-      error: function(err) {
-        console.error('CSV 로드 오류:', err);
-      }
-    });
+      });
   </script>
 </body>
 </html>
