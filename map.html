@@ -25,21 +25,17 @@
   ></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
   <script>
-    // 지도 초기화 (서울 시청 기준)
     const map = L.map('map').setView([37.5665, 126.978], 12);
 
-    // OSM 타일 레이어 추가
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    // 구글 스프레드시트 CSV URL
     const CSV_URL =
       'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=1518480195&single=true&output=csv';
 
-    // 주소를 위경도로 변환하는 함수 (Nominatim API)
     async function geocode(address) {
       const url =
         'https://nominatim.openstreetmap.org/search?format=json&q=' +
@@ -56,11 +52,10 @@
       return null;
     }
 
-    // 마커를 순차적으로 추가하는 함수 (1초 대기 포함)
     async function addMarkers(data) {
       for (const row of data) {
-        if (!row['주소']) continue;
-        const latlng = await geocode(row['주소']);
+        if (!row.주소) continue;
+        const latlng = await geocode(row.주소);
         if (!latlng) continue;
 
         const redIcon = L.icon({
@@ -75,24 +70,46 @@
         });
 
         const marker = L.marker(latlng, { icon: redIcon }).addTo(map);
+
+        // 메시지 필드에서 3부분 분리
+        // 예: "월튼파크뷰2차(LH) 0136-622 / 동대문구 장한로26다길 7 / 정지고장신고입니다. ..."
+        const message = row.메시지 || '';
+        const parts = message.split(' / ');
+        let 현장명 = '';
+        let 승강기번호 = '';
+        let 신고내용 = '';
+        if (parts.length >= 3) {
+          const firstPart = parts[0].trim();
+          const lastSpace = firstPart.lastIndexOf(' ');
+          if (lastSpace > -1) {
+            현장명 = firstPart.substring(0, lastSpace);
+            승강기번호 = firstPart.substring(lastSpace + 1);
+          } else {
+            현장명 = firstPart;
+          }
+          신고내용 = parts.slice(2).join(' / ').trim(); // 혹시 신고내용에 / 가 더 있을 수 있어 합침
+        }
+
         marker.bindPopup(`
-          <b>건물명:</b> ${row['건물명']}<br/>
-          <b>승강기번호:</b> ${row['승강기번호']}<br/>
-          <b>신고내용:</b> ${row['신고내용']}<br/>
-          <b>신고자번호:</b> ${row['신고자번호']}
+          <b>현장명:</b> ${현장명}<br/>
+          <b>승강기번호:</b> ${승강기번호}<br/>
+          <b>주소:</b> ${row.주소}<br/>
+          <b>신고내용:</b> ${신고내용}
         `);
 
-        // Nominatim 요청 제한 때문에 1초 대기
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 1000)); // 1초 대기 (Nominatim API 제한 대응)
       }
     }
 
-    // CSV를 불러와서 파싱 후 마커 추가 실행
     fetch(CSV_URL)
       .then((res) => res.text())
       .then((csvText) => {
-        const data = Papa.parse(csvText, { header: true }).data;
-        addMarkers(data);
+        const parsed = Papa.parse(csvText, { header: true });
+        // 주소와 메시지 필드가 모두 있을 때만 필터
+        const filtered = parsed.data.filter(
+          (r) => r.주소 && r.메시지 && r.메시지.includes(' / ')
+        );
+        addMarkers(filtered);
       })
       .catch((err) => console.error('CSV load error:', err));
   </script>
