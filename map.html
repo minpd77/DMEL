@@ -25,51 +25,32 @@
   ></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
   <script>
-    // 지도 초기화 (서울 시청 기준)
     const map = L.map('map').setView([37.5665, 126.978], 12);
 
-    // OSM 타일 레이어 추가
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    // CSV URL
-    const CSV_URL =
-      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=csv';
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=csv';
 
-    function parseLatLng(latlngStr) {
-      if (!latlngStr) return null;
-      const parts = latlngStr.split(',');
-      if (parts.length !== 2) return null;
-      const lat = parseFloat(parts[0].trim());
-      const lng = parseFloat(parts[1].trim());
-      if (isNaN(lat) || isNaN(lng)) return null;
-      return [lat, lng];
-    }
-
-    // 마커 추가
-    function addMarkers(data) {
-      data.forEach(row => {
-        const latlng = parseLatLng(row['AH']);
-        if (!latlng) return;
-
-        const siteName = row['AF'] || '현장명 없음';
-
-        const marker = L.marker(latlng).addTo(map);
-        marker.bindPopup(`<b>${siteName}</b><br/>${row['AH']}`);
-      });
-    }
-
-    // CSV 읽고 마커 생성 시작
     fetch(CSV_URL)
       .then(res => res.text())
       .then(csvText => {
-        const data = Papa.parse(csvText, { header: true }).data;
-        addMarkers(data);
-      })
-      .catch(err => console.error('CSV load error:', err));
+        const results = Papa.parse(csvText, { header: false });
+        results.data.forEach((row, i) => {
+          if(i === 0) return; // 첫 행 "위경도" 스킵
+          if(row.length === 0) return;
+          const coords = row[0].split(',');
+          if(coords.length !== 2) return;
+          const lat = parseFloat(coords[0].trim());
+          const lng = parseFloat(coords[1].trim());
+          if(isNaN(lat) || isNaN(lng)) return;
+
+          L.marker([lat, lng]).addTo(map);
+        });
+      });
   </script>
 </body>
 </html>
