@@ -2,56 +2,100 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>대명엘리베이터 고장신고 지도</title>
+  <title>고장신고 주소 기반 지도</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
   <style>
-    #map { height: 600px; width: 100%; }
+    #map {
+      width: 100%;
+      height: 600px;
+    }
   </style>
 </head>
 <body>
-  <h1>대명엘리베이터 고장신고 지도</h1>
+  <h1>고장신고 주소 기반 지도 (G열에서 주소 추출)</h1>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
   <script>
+    // 지도 초기화 (서울 중심)
     const map = L.map('map').setView([37.5665, 126.978], 12);
 
+    // OSM 타일 레이어 추가
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
+    // 구글 스프레드시트 CSV URL (G열 데이터 포함)
     const CSV_URL =
       'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
 
+    // Nominatim API로 주소 -> 위경도 변환 함수
+    async function geocode(address) {
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address);
+      try {
+        const res = await fetch(url);
+        const results = await res.json();
+        if (results.length > 0) {
+          return [parseFloat(results[0].lat), parseFloat(results[0].lon)];
+        }
+      } catch (e) {
+        console.error('Geocode error:', e);
+      }
+      return null;
+    }
+
+    // G열 텍스트에서 주소만 추출하는 함수
+    // 예시: "[고장] 올소빌딩 0135-835 / 동작구 신대방동 364-2 / 1층에서 정지고장신고입니다."
+    function extractAddress(text) {
+      const parts = text.split('/');
+      if (parts.length >= 2) {
+        return parts[1].trim();
+      }
+      return null;
+    }
+
+    // 빨간 마커 아이콘
+    const redIcon = L.icon({
+      iconUrl:
+        'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+      shadowUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41],
+    });
+
+    // CSV 불러와서 주소 추출, 좌표 변환 후 마커 추가
     fetch(CSV_URL)
       .then(res => res.text())
       .then(csvText => {
-        const data = Papa.parse(csvText, { header: true }).data;
+        const data = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data;
 
-        data.forEach(row => {
-          console.log('T열 좌표:', row['T']);
-          if (!row['T']) return;
+        for (const row of data) {
+          if (!row['G']) continue;
 
-          const latLng = row['T'].split(',');
-          console.log('split:', latLng);
-          if (latLng.length !== 2) return;
+          const addr = extractAddress(row['G']);
+          if (!addr) continue;
 
-          const lat = parseFloat(latLng[0]);
-          const lng = parseFloat(latLng[1]);
-          console.log('parsed:', lat, lng);
-          if (isNaN(lat) || isNaN(lng)) return;
-
-          L.marker([lat, lng]).addTo(map);
-        });
+          // 주소 -> 좌표 변환 후 마커 추가
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 딜레이 (Nominatim 정책)
+          const latlng = await geocode(addr);
+          if (latlng) {
+            L.marker(latlng, { icon: redIcon })
+              .addTo(map)
+              .bindPopup(`<b>주소:</b> ${addr}<br/><b>원문:</b> ${row['G']}`);
+          }
+        }
       })
-      .catch(err => console.error('CSV load or parse error:', err));
+      .catch(err => console.error('CSV 로드 오류:', err));
   </script>
 </body>
 </html>
