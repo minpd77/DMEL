@@ -2,83 +2,95 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>고장신고 주소 기반 지도</title>
+  <title>고장신고 지도</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
   />
-  <style>#map { height: 600px; width: 100%; }</style>
+  <style>
+    #map {
+      height: 600px;
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
-  <h1>고장신고 주소 기반 지도</h1>
+  <h1>대명엘리베이터 고장신고 지도</h1>
   <div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
   <script>
-    (async () => {
-      // 지도 초기화 (서울 시청 중심)
-      const map = L.map('map').setView([37.5665, 126.978], 12);
+    const map = L.map('map').setView([37.5665, 126.978], 12); // 서울 시청 중심
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
 
-      const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=tsv';
+    const CSV_URL =
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
 
-      // G열 텍스트에서 주소(두 번째 슬래시 뒤)를 추출
-      function extractAddress(text) {
-        if (!text) return null;
-        const parts = text.split('/');
-        if (parts.length >= 2) return parts[1].trim();
-        return null;
-      }
-
-      // Nominatim API를 이용해 주소 → [lat, lon] 변환
-      async function geocode(address) {
-        const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address);
-        try {
-          const res = await fetch(url);
-          const results = await res.json();
-          if (results.length > 0) {
-            return [parseFloat(results[0].lat), parseFloat(results[0].lon)];
-          }
-        } catch (e) {
-          console.error('Geocode error:', e);
-        }
-        return null;
-      }
-
+    async function geocode(address) {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
       try {
-        const res = await fetch(CSV_URL);
-        const csvText = await res.text();
-        const data = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data;
-
-        for (const row of data) {
-          if (!row['G']) continue;
-          const addr = extractAddress(row['G']);
-          if (!addr) continue;
-
-          console.log('주소:', addr);
-          // Nominatim 요청 제한으로 1초 대기
-          await new Promise(r => setTimeout(r, 1000));
-
-          const latlng = await geocode(addr);
-          console.log('좌표:', latlng);
-
-          if (latlng) {
-            L.marker(latlng).addTo(map).bindPopup(`
-              <b>주소</b>: ${addr}<br/>
-              <b>신고정보</b>: ${row['G']}
-            `);
-          }
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.length > 0) {
+          return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
         }
-      } catch (e) {
-        console.error('Error:', e);
+      } catch (err) {
+        console.error('Geocode error:', err);
       }
-    })();
+      return null;
+    }
+
+    async function addMarkers(rows) {
+      for (const row of rows) {
+        const msg = row['메시지'] || row['G'] || ''; // G열 내용
+        if (!msg.includes(' / ')) continue;
+
+        const parts = msg.split(' / ');
+        if (parts.length < 3) continue;
+
+        const [info, addr, content] = parts;
+        const lastSpace = info.lastIndexOf(' ');
+        const building = lastSpace > 0 ? info.substring(0, lastSpace) : info;
+        const elevator = lastSpace > 0 ? info.substring(lastSpace + 1) : '';
+
+        const latlng = await geocode(addr.trim());
+        if (!latlng) continue;
+
+        const redIcon = L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+        });
+
+        const marker = L.marker(latlng, { icon: redIcon }).addTo(map);
+        marker.bindPopup(`
+          <b>현장명:</b> ${building}<br/>
+          <b>주소:</b> ${addr.trim()}<br/>
+          <b>신고내용:</b> ${content.trim()}
+        `);
+
+        await new Promise((r) => setTimeout(r, 1000)); // Nominatim 요청 제한 우회
+      }
+    }
+
+    fetch(CSV_URL)
+      .then((res) => res.text())
+      .then((csvText) => {
+        const parsed = Papa.parse(csvText, { header: true }).data;
+        addMarkers(parsed);
+      })
+      .catch((err) => console.error('CSV load error:', err));
   </script>
 </body>
 </html>
