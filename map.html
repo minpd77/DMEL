@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>대명엘리베이터 고장신고 지도</title>
+  <title>위도경도 테스트 지도</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h1>대명엘리베이터 고장신고 지도</h1>
+  <h1>위도경도 좌표 테스트 지도</h1>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -23,8 +23,6 @@
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
     const CSV_URL =
@@ -44,16 +42,8 @@
           const lng = parseFloat(latLng[1]);
           if (isNaN(lat) || isNaN(lng)) return;
 
-          L.marker([lat, lng])
-            .addTo(map)
-            .bindPopup(`
-              <b>현장명/신고내용:</b><br/>
-              ${row['G'] || '정보없음'}
-            `);
+          L.marker([lat, lng]).addTo(map);
         });
-      })
-      .catch(err => {
-        console.error('CSV 로드 오류:', err);
       });
   </script>
 </body>
