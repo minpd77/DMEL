@@ -39,49 +39,37 @@
     const CSV_URL =
       'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=csv';
 
-    // 주소 → 위경도 변환 (Nominatim)
-    async function geocode(address) {
-      const url =
-        'https://nominatim.openstreetmap.org/search?format=json&q=' +
-        encodeURIComponent(address);
-      try {
-        const res = await fetch(url);
-        const results = await res.json();
-        if (results.length > 0) {
-          return [parseFloat(results[0].lat), parseFloat(results[0].lon)];
-        }
-      } catch (e) {
-        console.error('Geocode error:', e);
-      }
-      return null;
+    function parseLatLng(latlngStr) {
+      if (!latlngStr) return null;
+      const parts = latlngStr.split(',');
+      if (parts.length !== 2) return null;
+      const lat = parseFloat(parts[0].trim());
+      const lng = parseFloat(parts[1].trim());
+      if (isNaN(lat) || isNaN(lng)) return null;
+      return [lat, lng];
     }
 
-    // 마커 추가 (1초 딜레이로 순차 실행)
-    async function addMarkers(data) {
-      for (const row of data) {
-        const address = row['AH'];
-        const siteName = row['AF'];
-        if (!address) continue;
+    // 마커 추가
+    function addMarkers(data) {
+      data.forEach(row => {
+        const latlng = parseLatLng(row['AH']);
+        if (!latlng) return;
 
-        const latlng = await geocode(address);
-        if (!latlng) continue;
+        const siteName = row['AF'] || '현장명 없음';
 
         const marker = L.marker(latlng).addTo(map);
-        marker.bindPopup(`<b>${siteName || '현장명 없음'}</b><br/>${address}`);
-
-        // Nominatim 요청 제한 때문에 1초 대기
-        await new Promise((r) => setTimeout(r, 1000));
-      }
+        marker.bindPopup(`<b>${siteName}</b><br/>${row['AH']}`);
+      });
     }
 
     // CSV 읽고 마커 생성 시작
     fetch(CSV_URL)
-      .then((res) => res.text())
-      .then((csvText) => {
+      .then(res => res.text())
+      .then(csvText => {
         const data = Papa.parse(csvText, { header: true }).data;
         addMarkers(data);
       })
-      .catch((err) => console.error('CSV load error:', err));
+      .catch(err => console.error('CSV load error:', err));
   </script>
 </body>
 </html>
