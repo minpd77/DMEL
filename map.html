@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>고장신고 테스트 지도</title>
+  <title>고장신고 주소 기반 지도</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -10,7 +10,7 @@
   <style>#map { height: 600px; width: 100%; }</style>
 </head>
 <body>
-  <h1>고장신고 주소 기반 지도 (테스트)</h1>
+  <h1>고장신고 주소 기반 지도</h1>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -18,7 +18,9 @@
 
   <script>
     (async () => {
+      // 지도 초기화 (서울 시청 중심)
       const map = L.map('map').setView([37.5665, 126.978], 12);
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors',
@@ -26,12 +28,15 @@
 
       const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
 
+      // G열 텍스트에서 주소(두 번째 슬래시 뒤)를 추출
       function extractAddress(text) {
+        if (!text) return null;
         const parts = text.split('/');
         if (parts.length >= 2) return parts[1].trim();
         return null;
       }
 
+      // Nominatim API를 이용해 주소 → [lat, lon] 변환
       async function geocode(address) {
         const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address);
         try {
@@ -55,12 +60,19 @@
           if (!row['G']) continue;
           const addr = extractAddress(row['G']);
           if (!addr) continue;
+
           console.log('주소:', addr);
-          await new Promise(r => setTimeout(r, 1000)); // 1초 대기
+          // Nominatim 요청 제한으로 1초 대기
+          await new Promise(r => setTimeout(r, 1000));
+
           const latlng = await geocode(addr);
           console.log('좌표:', latlng);
+
           if (latlng) {
-            L.marker(latlng).addTo(map).bindPopup(addr);
+            L.marker(latlng).addTo(map).bindPopup(`
+              <b>주소</b>: ${addr}<br/>
+              <b>신고정보</b>: ${row['G']}
+            `);
           }
         }
       } catch (e) {
