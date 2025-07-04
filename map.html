@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>대명엘리베이터 현장지도 - D열 주소 마커</title>
+  <title>대명엘리베이터 현장지도 - G열 주소 마커</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h1>대명엘리베이터 현장지도 (D열 주소 마커)</h1>
+  <h1>대명엘리베이터 현장지도 (G열 주소 기준)</h1>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -22,7 +22,7 @@
     // 지도 초기화 (서울 시청 기준)
     const map = L.map('map').setView([37.5665, 126.978], 12);
 
-    // OSM 타일 레이어 추가
+    // OpenStreetMap 타일 레이어 추가
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution:
@@ -31,9 +31,9 @@
 
     // CSV URL (구글 스프레드시트 퍼블릭 CSV)
     const CSV_URL =
-      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=1518480195&single=true&output=csv';
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
 
-    // 주소 → 위경도 변환 함수 (Nominatim)
+    // 주소를 위경도로 변환하는 함수 (Nominatim API)
     async function geocode(address) {
       if (!address) return null;
       const url =
@@ -51,10 +51,10 @@
       return null;
     }
 
-    // 마커 추가 (1초 간격으로 요청 제한 회피)
+    // 마커를 1초 간격으로 추가하는 함수 (API 요청 제한 회피용)
     async function addMarkers(data) {
       for (const row of data) {
-        const address = row['D'];
+        const address = row['G']; // G열 주소
         if (!address) continue;
 
         console.log('주소:', address);
@@ -65,11 +65,12 @@
           .addTo(map)
           .bindPopup(`<b>주소:</b> ${address}`);
 
-        await new Promise((r) => setTimeout(r, 1000)); // 1초 대기
+        // 1초 대기
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
 
-    // CSV 불러오기 및 마커 표시 시작
+    // CSV 불러와서 파싱 후 마커 찍기
     fetch(CSV_URL)
       .then((res) => res.text())
       .then((csvText) => {
