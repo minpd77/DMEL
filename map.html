@@ -34,10 +34,14 @@
 
       async function geocode(address) {
         const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address);
-        const res = await fetch(url);
-        const results = await res.json();
-        if (results.length > 0) {
-          return [parseFloat(results[0].lat), parseFloat(results[0].lon)];
+        try {
+          const res = await fetch(url);
+          const results = await res.json();
+          if (results.length > 0) {
+            return [parseFloat(results[0].lat), parseFloat(results[0].lon)];
+          }
+        } catch (e) {
+          console.error('Geocode error:', e);
         }
         return null;
       }
@@ -51,8 +55,10 @@
           if (!row['G']) continue;
           const addr = extractAddress(row['G']);
           if (!addr) continue;
+          console.log('주소:', addr);
           await new Promise(r => setTimeout(r, 1000)); // 1초 대기
           const latlng = await geocode(addr);
+          console.log('좌표:', latlng);
           if (latlng) {
             L.marker(latlng).addTo(map).bindPopup(addr);
           }
