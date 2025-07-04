@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>대명엘리베이터 고장신고 지도</title>
+  <title>고장신고 지도</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -23,7 +23,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
   <script>
-    const map = L.map('map').setView([37.5665, 126.978], 12);
+    const map = L.map('map').setView([37.5665, 126.978], 12); // 서울 시청 중심
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -32,25 +32,25 @@
     }).addTo(map);
 
     const CSV_URL =
-      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=1518480195&single=true&output=csv';
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1682703072&single=true&output=csv';
 
     async function geocode(address) {
-      const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address);
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
       try {
-        const response = await fetch(url);
-        const results = await response.json();
-        if (results.length > 0) {
-          return [parseFloat(results[0].lat), parseFloat(results[0].lon)];
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.length > 0) {
+          return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
         }
-      } catch (e) {
-        console.error('Geocode error:', e);
+      } catch (err) {
+        console.error('Geocode error:', err);
       }
       return null;
     }
 
     async function addMarkers(rows) {
       for (const row of rows) {
-        const msg = row['메시지'] || row['신고내용'] || '';
+        const msg = row['메시지'] || row['G'] || ''; // G열 내용
         if (!msg.includes(' / ')) continue;
 
         const parts = msg.split(' / ');
@@ -75,13 +75,12 @@
 
         const marker = L.marker(latlng, { icon: redIcon }).addTo(map);
         marker.bindPopup(`
-          <b>건물명:</b> ${building}<br/>
-          <b>승강기번호:</b> ${elevator}<br/>
+          <b>현장명:</b> ${building}<br/>
           <b>주소:</b> ${addr.trim()}<br/>
           <b>신고내용:</b> ${content.trim()}
         `);
 
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 1000)); // Nominatim 요청 제한 우회
       }
     }
 
