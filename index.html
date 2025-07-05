@@ -9,40 +9,7 @@
   href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
 />
 <style>
-  html, body {
-    height: 100%;
-    margin: 0; padding: 0;
-  }
-  body {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    font-family: Arial, sans-serif;
-  }
-  h2 {
-    margin: 10px;
-    flex-shrink: 0;
-  }
-  .team-filter {
-    flex-shrink: 0;
-    margin: 0 10px 10px 10px;
-    background: white;
-    padding: 8px 12px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    font-size: 14px;
-    position: relative; /* z-index 충돌 방지용 */
-    z-index: 1000;
-  }
-  .team-filter label {
-    display: block;
-    margin-bottom: 6px;
-    cursor: pointer;
-  }
-  #map {
-    flex-grow: 1;
-    width: 100%;
-  }
+  #map { width: 100%; height: 90vh; }
   .custom-popup {
     font-size: 14px;
     line-height: 1.4;
@@ -51,14 +18,31 @@
   }
   .marker-label {
     position: absolute;
-    top: 60%;
-    left: 60%;
+    top: 60%;  /* 숫자 위치 약간 아래 */
+    left: 60%; /* 숫자 위치 약간 오른쪽 */
     transform: translate(-50%, -50%);
     color: white;
     font-weight: 700;
+    font-size: 12px;
     pointer-events: none;
     user-select: none;
     line-height: 1;
+  }
+  .team-filter {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    z-index: 1000;
+    font-size: 14px;
+  }
+  .team-filter label {
+    display: block;
+    margin-bottom: 6px;
+    cursor: pointer;
   }
   #searchBox {
     position: fixed;
@@ -144,39 +128,33 @@
   }).addTo(map);
 
   const idx = {
-    coord: 1,
-    address: 7,
-    special: 21,
-    checkDate: 11,
-    wNum: 23,
-    contact: 24,
-    model: 27,
-    fan: 28,
-    biTongNum: 26,
-    expire: 30,
-    siteName: 32,
-    team: 19
+    coord: 1,       // B열: 위도,경도 (콤마 구분)
+    address: 7,     // H열: 주소
+    special: 21,    // V열: 특이사항
+    checkDate: 11,  // L열: 점검
+    wNum: 23,       // X열: 비통번호 (7자리 숫자)
+    contact: 24,    // Y열: 연락처
+    model: 27,      // AB열: 기종
+    fan: 28,        // AC열: Fan
+    biTongNum: 26,  // AA열: 비통번호
+    expire: 30,     // AE열: 유효기간
+    siteName: 32,   // AG열: 현장명
+    team: 19        // T열: 팀명 (강남팀, 강북팀 등)
   };
 
   let coordGroups = {};
   let markers = [];
-  let markerData = [];
+  let markerData = []; // [{marker, popupHtmlOriginal, baseColor}]
 
-  const highlightMarkerColor = "#F6BB43";
+  const highlightMarkerColor = "#F6BB43"; // 주황색
   const highlightTextColor = "red";
 
+  // 내 위치 마커
   let currentLocationMarker = null;
-
-  // 마커 크기 화면 너비에 따라 동적 설정 함수
-  function getMarkerSize() {
-    const width = window.innerWidth;
-    if(width < 400) return 12;
-    if(width < 700) return 16;
-    if(width < 1000) return 20;
-    return 24;
-  }
+  let currentLocationAccuracyCircle = null;
 
   async function fetchTSVandPlot() {
+    // 기존 마커 제거
     markers.forEach(m => map.removeLayer(m));
     markers = [];
     markerData = [];
@@ -188,6 +166,8 @@
     const data = rows.slice(1);
 
     coordGroups = {};
+
+    // 체크된 팀 가져오기
     const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
 
     data.forEach(row => {
@@ -206,11 +186,11 @@
 
       let color = "";
       if (checkDateVal && isValidDate(checkDateVal)) {
-        color = "#999999";
+        color = "#999999"; // 회색
       } else if (team.includes("강남팀")) {
-        color = "#00c04b";
+        color = "#00c04b"; // 녹색
       } else if (team.includes("강북팀")) {
-        color = "#0019f4";
+        color = "#0019f4"; // 파랑
       } else {
         return;
       }
@@ -227,8 +207,6 @@
       }
       coordGroups[key].entries.push(row);
     });
-
-    const markerSize = getMarkerSize();
 
     Object.values(coordGroups).forEach(group => {
       const {lat, lng, color, entries} = group;
@@ -251,6 +229,7 @@
       const dMinus = calcDateDiff(expire);
       const formattedWNum = formatWNum(wRaw);
 
+      // FAN 상태에 따른 원 모양(색상)
       let fanCircleHtml = "";
       const fanLower = fan.toLowerCase();
       if(fanLower === "on"){
@@ -276,15 +255,15 @@
         </div>`;
 
       const countLabel = count > 1
-        ? `<div class="marker-label" style="background-color:${color}; font-size:${markerSize * 0.7}px; width:${markerSize}px; height:${markerSize}px; line-height:${markerSize}px;">${count}</div>`
+        ? `<div class="marker-label" style="background-color:${color};">${count}</div>`
         : "";
 
       const markerHtml = `
-        <div style="position: relative; width: ${markerSize}px; height: ${markerSize}px;">
+        <div style="position: relative; width: 18px; height: 18px;">
           <div style="
             background-color: ${color};
-            width: ${markerSize}px;
-            height: ${markerSize}px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             border: 2px solid white;
             box-shadow: 0 0 3px rgba(0,0,0,0.4);
@@ -295,9 +274,9 @@
       const icon = L.divIcon({
         className: "",
         html: markerHtml,
-        iconSize: [markerSize, markerSize],
-        iconAnchor: [markerSize/2, markerSize/2],
-        popupAnchor: [0, -markerSize * 0.75]
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+        popupAnchor: [0, -12]
       });
 
       const marker = L.marker([lat, lng], { icon: icon })
@@ -313,11 +292,13 @@
     });
   }
 
+  // 날짜 문자열 한글 제거 후 파싱 + 음수 포함 D-day 출력
   function calcDateDiff(dateStr) {
     if (!dateStr) return "";
+    // '2026년 02월 07일' 같은 형식 처리용
     let cleanDateStr = dateStr
-      .replace(/[^\d\-]/g, '')
-      .replace(/-{2,}/g, '-');
+      .replace(/[^\d\-]/g, '')   // 숫자와 '-'만 남김
+      .replace(/-{2,}/g, '-');   // 연속된 '-' 하나로 치환
 
     if(/^\d{8}$/.test(cleanDateStr)) {
       cleanDateStr = cleanDateStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
@@ -340,13 +321,39 @@
     return !isNaN(new Date(d).getTime());
   }
 
+  // 검색어에 대해 팝업 텍스트 단어 완전 일치시 텍스트 빨강, 마커 주황
   function updatePopupHighlight(keyword) {
     const lowerKeyword = keyword.trim().toLowerCase();
     if (lowerKeyword === "") {
+      // 검색어 없으면 모두 원래대로
       markerData.forEach(({ marker, popupHtmlOriginal, baseColor }) => {
         if (!marker.getPopup()) return;
         marker.setPopupContent(popupHtmlOriginal);
-        resetMarkerIcon(marker, baseColor);
+
+        const countLabelMatch = marker.getIcon().options.html.match(/<div class="marker-label" style="background-color:[^"]+;">(\d+)<\/div>/);
+        const countLabelHtml = countLabelMatch ? `<div class="marker-label" style="background-color:${baseColor};">${countLabelMatch[1]}</div>` : "";
+
+        const newMarkerHtml = `
+          <div style="position: relative; width: 18px; height: 18px;">
+            <div style="
+              background-color: ${baseColor};
+              width: 18px;
+              height: 18px;
+              border-radius: 50%;
+              border: 2px solid white;
+              box-shadow: 0 0 3px rgba(0,0,0,0.4);
+            "></div>
+            ${countLabelHtml}
+          </div>`;
+
+        const newIcon = L.divIcon({
+          className: "",
+          html: newMarkerHtml,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+          popupAnchor: [0, -12]
+        });
+        marker.setIcon(newIcon);
       });
       return;
     }
@@ -356,79 +363,78 @@
 
       const popupTextLower = popupHtmlOriginal.toLowerCase();
 
+      // 단어 경계로 keyword 완전 일치 체크
       const keywordRegex = new RegExp(`\\b${escapeRegExp(lowerKeyword)}\\b`);
 
       if (keywordRegex.test(popupTextLower)) {
+        // 키워드 정확히 단어 단위 포함됨 → 강조
         const newHtml = popupHtmlOriginal.replace(/color:\s*black/g, `color: ${highlightTextColor}`);
         marker.setPopupContent(newHtml);
-        setMarkerIcon(marker, highlightMarkerColor);
+
+        const countLabelMatch = marker.getIcon().options.html.match(/<div class="marker-label" style="background-color:[^"]+;">(\d+)<\/div>/);
+        const countLabelHtml = countLabelMatch ? `<div class="marker-label" style="background-color:${highlightMarkerColor};">${countLabelMatch[1]}</div>` : "";
+
+        const newMarkerHtml = `
+          <div style="position: relative; width: 18px; height: 18px;">
+            <div style="
+              background-color: ${highlightMarkerColor};
+              width: 18px;
+              height: 18px;
+              border-radius: 50%;
+              border: 2px solid white;
+              box-shadow: 0 0 3px rgba(0,0,0,0.4);
+            "></div>
+            ${countLabelHtml}
+          </div>`;
+
+        const newIcon = L.divIcon({
+          className: "",
+          html: newMarkerHtml,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+          popupAnchor: [0, -12]
+        });
+        marker.setIcon(newIcon);
+
       } else {
+        // 키워드 없으면 원래색상 유지
         marker.setPopupContent(popupHtmlOriginal);
-        resetMarkerIcon(marker, baseColor);
+
+        const countLabelMatch = marker.getIcon().options.html.match(/<div class="marker-label" style="background-color:[^"]+;">(\d+)<\/div>/);
+        const countLabelHtml = countLabelMatch ? `<div class="marker-label" style="background-color:${baseColor};">${countLabelMatch[1]}</div>` : "";
+
+        const newMarkerHtml = `
+          <div style="position: relative; width: 18px; height: 18px;">
+            <div style="
+              background-color: ${baseColor};
+              width: 18px;
+              height: 18px;
+              border-radius: 50%;
+              border: 2px solid white;
+              box-shadow: 0 0 3px rgba(0,0,0,0.4);
+            "></div>
+            ${countLabelHtml}
+          </div>`;
+
+        const newIcon = L.divIcon({
+          className: "",
+          html: newMarkerHtml,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+          popupAnchor: [0, -12]
+        });
+        marker.setIcon(newIcon);
       }
     });
+
   }
 
-  function resetMarkerIcon(marker, baseColor) {
-    const markerSize = getMarkerSize();
-    const countLabelMatch = marker.getIcon().options.html.match(/<div class="marker-label" style="background-color:[^"]+;">(\d+)<\/div>/);
-    const countLabelHtml = countLabelMatch ? `<div class="marker-label" style="background-color:${baseColor}; font-size:${markerSize * 0.7}px; width:${markerSize}px; height:${markerSize}px; line-height:${markerSize}px;">${countLabelMatch[1]}</div>` : "";
-
-    const newMarkerHtml = `
-      <div style="position: relative; width: ${markerSize}px; height: ${markerSize}px;">
-        <div style="
-          background-color: ${baseColor};
-          width: ${markerSize}px;
-          height: ${markerSize}px;
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 0 3px rgba(0,0,0,0.4);
-        "></div>
-        ${countLabelHtml}
-      </div>`;
-
-    const newIcon = L.divIcon({
-      className: "",
-      html: newMarkerHtml,
-      iconSize: [markerSize, markerSize],
-      iconAnchor: [markerSize/2, markerSize/2],
-      popupAnchor: [0, -markerSize * 0.75]
-    });
-    marker.setIcon(newIcon);
-  }
-
-  function setMarkerIcon(marker, color) {
-    const markerSize = getMarkerSize();
-    const countLabelMatch = marker.getIcon().options.html.match(/<div class="marker-label" style="background-color:[^"]+;">(\d+)<\/div>/);
-    const countLabelHtml = countLabelMatch ? `<div class="marker-label" style="background-color:${color}; font-size:${markerSize * 0.7}px; width:${markerSize}px; height:${markerSize}px; line-height:${markerSize}px;">${countLabelMatch[1]}</div>` : "";
-
-    const newMarkerHtml = `
-      <div style="position: relative; width: ${markerSize}px; height: ${markerSize}px;">
-        <div style="
-          background-color: ${color};
-          width: ${markerSize}px;
-          height: ${markerSize}px;
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 0 3px rgba(0,0,0,0.4);
-        "></div>
-        ${countLabelHtml}
-      </div>`;
-
-    const newIcon = L.divIcon({
-      className: "",
-      html: newMarkerHtml,
-      iconSize: [markerSize, markerSize],
-      iconAnchor: [markerSize/2, markerSize/2],
-      popupAnchor: [0, -markerSize * 0.75]
-    });
-    marker.setIcon(newIcon);
-  }
-
+  // 정규식 특수문자 이스케이프 함수
   function escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  // 현재 위치 표시 함수
   function locateAndMark() {
     if (!navigator.geolocation) {
       alert("이 브라우저에서는 위치 정보를 사용할 수 없습니다.");
@@ -439,13 +445,12 @@
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
 
-      const redDotSize = getMarkerSize() * 0.5;
-
+      // 내 위치 아이콘 - 빨간 원, 기존 마커 크기의 50%
       const redDotHtml = `
         <div style="
           background-color: red;
-          width: ${redDotSize}px;
-          height: ${redDotSize}px;
+          width: 9px;  /* 18px * 0.5 */
+          height: 9px;
           border-radius: 50%;
           border: 2px solid white;
           box-shadow: 0 0 4px rgba(0,0,0,0.6);
@@ -454,9 +459,9 @@
       const redIcon = L.divIcon({
         className: "",
         html: redDotHtml,
-        iconSize: [redDotSize, redDotSize],
-        iconAnchor: [redDotSize/2, redDotSize/2],
-        popupAnchor: [0, -redDotSize]
+        iconSize: [9, 9],
+        iconAnchor: [4, 4],
+        popupAnchor: [0, -8]
       });
 
       if (currentLocationMarker) {
@@ -471,7 +476,33 @@
     }, { enableHighAccuracy: true });
   }
 
-  // 창 크기 변경 시 마커 크기 재조정
-  window.addEventListener('resize', () => {
-    const markerSize = getMarkerSize();
-    markerData.forEach
+  // 이벤트 바인딩
+  document.querySelectorAll('.team-filter input').forEach(input => {
+    input.addEventListener('change', () => {
+      fetchTSVandPlot().then(() => {
+        // 검색어가 있으면 검색어 기준 다시 하이라이트 적용
+        updatePopupHighlight(document.getElementById('searchInput').value);
+      });
+    });
+  });
+
+  document.getElementById("locationBtn").addEventListener("click", locateAndMark);
+
+  const searchInput = document.getElementById("searchInput");
+  const searchClear = document.getElementById("searchClear");
+
+  searchInput.addEventListener("input", () => {
+    updatePopupHighlight(searchInput.value);
+  });
+
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    updatePopupHighlight("");
+    searchInput.focus();
+  });
+
+  fetchTSVandPlot();
+
+</script>
+</body>
+</html>
