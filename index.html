@@ -9,6 +9,12 @@
   href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
 />
 <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
   #map { width: 100%; height: 90vh; }
   .custom-popup {
     font-size: 14px;
@@ -32,17 +38,21 @@
     user-select: none;
     line-height: 1;
     border-radius: 50%;
+    white-space: nowrap;
   }
   .team-filter {
     position: fixed;
     top: 10px;
     right: 10px;
+    max-width: 180px;
     background: white;
     padding: 8px 12px;
     border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     z-index: 1000;
     font-size: 14px;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
   .team-filter label {
     display: block;
@@ -52,14 +62,16 @@
   #searchBox {
     position: fixed;
     bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
+    left: 10px;  /* 왼쪽 하단으로 위치 변경 */
+    max-width: 280px;
     background: white;
     padding: 6px 10px;
     border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    z-index: 1000;
     font-size: 14px;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
   #searchInput {
     width: 220px;
@@ -348,7 +360,8 @@
             pointer-events: none;
             user-select: none;
             border-radius: 50%;
-          ">${count}</div>`
+            white-space: nowrap;
+          "> ${count}</div>` // 숫자 앞에 공백 U+00A0 (non-breaking space) 넣음
         : "";
 
       function createMarkerHtml(color) {
@@ -458,15 +471,15 @@
   // 전화번호 검색도 포함하도록 공백/-, () 무시한 텍스트 비교
   // 모든 컬럼 텍스트 검색 대상 확장
   function searchMatch(row, query) {
-    if (!row || !query) return false;
+    if (!query) return false;
     const cleanQuery = query.toLowerCase().replace(/[\s\-\(\)]/g,"");
-    // 검색할 필드 리스트 - 모든 컬럼 텍스트 포함
+
+    // 검색 대상 컬럼 인덱스
     const searchFields = [
-      idx.address, idx.contact, idx.wNum, idx.special, idx.siteName,
+      idx.address, idx.contact, idx.siteName,
       idx.model, idx.fan, idx.biTongNum, idx.biTongEquip, idx.team,
-      idx.checkDate, idx.expire
+      idx.checkDate, idx.expire, idx.wNum
     ];
-    // 여러 필드 중 하나라도 포함되면 true
     for (const fieldIdx of searchFields) {
       const val = row[fieldIdx];
       if (!val) continue;
@@ -478,7 +491,7 @@
     return false;
   }
 
-  // 검색어 포함 텍스트를 빨간색 강조 표시 함수
+  // 검색어 텍스트 빨간색 강조
   function highlightText(text, query) {
     if (!query) return text;
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -486,7 +499,6 @@
     return text.replace(regex, match => `<span class="highlight-text">${match}</span>`);
   }
 
-  // 검색 결과 마커 스타일, 팝업 강조 적용
   function updateMarkerHighlighting() {
     const query = searchInput.value.trim();
 
@@ -508,17 +520,13 @@
           popupAnchor: [0, -markerSize / 2]
         }));
 
-        // 팝업 내 텍스트들에 검색어 빨간색 강조
         let newPopup = popupHtmlOriginal;
-
-        // entries 별 각 항목 강조 처리
         entries.forEach(row => {
           for (const colIdx of Object.values(idx)) {
             if (!row[colIdx]) continue;
             const origText = row[colIdx];
             const highlighted = highlightText(origText, query);
             if (highlighted !== origText) {
-              // popupHtmlOriginal 전체에서 원본 텍스트를 하이라이트된 텍스트로 치환
               const safeOrigText = origText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               const reg = new RegExp(safeOrigText, 'g');
               newPopup = newPopup.replace(reg, highlighted);
@@ -543,6 +551,7 @@
   }
 
   fetchTSVandPlot();
+
 </script>
 </body>
 </html>
