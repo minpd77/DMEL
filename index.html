@@ -1,25 +1,41 @@
-<script>
-  // 이 값들은 깃허브 Actions에서 자동 치환하여 실제 키가 들어가게 합니다.
-  const CLIENT_ID = 'NAVER_CLIENT_ID';
-  const CLIENT_SECRET = 'NAVER_CLIENT_SECRET';
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>네이버 지도 테스트</title>
+  <style>
+    #map {
+      width: 100%;
+      height: 600px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
 
-  function initMap() {
-    const script = document.createElement('script');
-    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${CLIENT_ID}`;
-    script.onload = () => {
-      const map = new naver.maps.Map('map', {
-        center: new naver.maps.LatLng(37.5665, 126.9780),
-        zoom: 12
-      });
+  <script>
+    const CLIENT_ID = 'NAVER_CLIENT_ID';
+    const CLIENT_SECRET = 'NAVER_CLIENT_SECRET';
 
-      const marker = new naver.maps.Marker({
-        position: new naver.maps.LatLng(37.5665, 126.9780),
-        map: map,
-        title: '서울 시청'
-      });
-    };
-    document.head.appendChild(script);
-  }
+    function initMap() {
+      const script = document.createElement('script');
+      script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${CLIENT_ID}`;
+      script.onload = () => {
+        const map = new naver.maps.Map('map', {
+          center: new naver.maps.LatLng(37.5665, 126.9780),
+          zoom: 12
+        });
 
-  window.onload = initMap;
-</script>
+        const marker = new naver.maps.Marker({
+          position: new naver.maps.LatLng(37.5665, 126.9780),
+          map: map,
+          title: '서울 시청'
+        });
+      };
+      document.head.appendChild(script);
+    }
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
