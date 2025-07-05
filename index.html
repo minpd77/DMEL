@@ -41,10 +41,9 @@
     white-space: nowrap;
     letter-spacing: 2px;
   }
-  /* 필터 박스를 내 위치 버튼 바로 위 오른쪽 아래로 이동 */
   .team-filter {
     position: fixed;
-    bottom: 60px; /* 내 위치 버튼(40px 높이 + 10px 간격) 위 */
+    bottom: 60px;
     right: 10px;
     max-width: 180px;
     background: white;
@@ -68,7 +67,7 @@
     bottom: 10px;
     left: 10px;
     max-width: 280px;
-    width: calc(100vw - 40px); /* 좌우 10px 여백 제외한 화면 가로 폭 최대 */
+    width: calc(100vw - 40px);
     max-width: 280px;
     background: white;
     padding: 6px 10px;
@@ -121,16 +120,13 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
-  /* 검색어 매칭 텍스트 스타일 */
   .highlight-text {
     color: red !important;
     font-weight: 700;
   }
-
-  /* 모바일 기기에서 필터, 검색창 위치 조정 */
   @media (max-width: 480px) {
     .team-filter {
-      bottom: 60px; /* 내 위치 버튼 바로 위 */
+      bottom: 60px;
       right: 10px;
       max-width: 90vw;
       max-height: 25vh;
@@ -204,9 +200,14 @@
   let markers = [];
   let markerData = [];
 
-  const highlightMarkerColor = "#F6BB43"; // 검색 매칭 시 주황색
-  const grayMarkerBaseColor = "rgba(153, 153, 153, 0.5)"; // 회색 + 투명도 50%
-  const disabledOpacity = 0.5; // 검색/검사필요 필터 제외된 마커 투명도
+  const colors = {
+    orange: "rgba(246, 187, 67, 1)",      // 검색 시 주황 (불투명)
+    gray: "rgba(153, 153, 153, .7)",      // 기본 회색 (70% 불투명)
+    gray75: "rgba(153, 153, 153, 0.5)",   // 검색 시 일치 안 할 때 50% 불투명 회색
+    green: "rgba(0, 192, 75, 1)",         // 강남팀 녹색 (불투명)
+    blue: "rgba(0, 25, 244, 1)",          // 강북팀 파란색 (불투명)
+    red: "rgba(255, 59, 59, 1)",          // 검사필요 빨간색 (불투명)
+  };
 
   let currentLocationMarker = null;
   let inspectionNeededChecked = false;
@@ -278,31 +279,29 @@
       const lng = parseFloat(parts[1]);
       if (isNaN(lat) || isNaN(lng)) return;
 
-      // 검사필요 체크 시 필터링 (60일 이내 유효기간)
       if (inspectionNeededChecked) {
         const expire = row[idx.expire] || "";
         const dDayNum = calcDateDiffNumber(expire);
         if (dDayNum === null || dDayNum > 60) return;
       } else {
-        // 검사필요 체크 안 하면 팀 필터 체크 기준
         if (!(checkedTeams.includes("강남팀") || checkedTeams.includes("강북팀"))) return;
         if (!checkedTeams.some(t => team.includes(t))) return;
       }
 
+      // 팀별 색상 및 점검날짜 기준 회색 처리
       let color = "";
       if (inspectionNeededChecked) {
-        color = "#FF3B3B"; // 검사필요 빨간색
+        color = colors.red;
       } else if (row[idx.checkDate] && isValidDate(row[idx.checkDate])) {
-        color = grayMarkerBaseColor; // 회색 + 50% 투명도
+        color = colors.gray;
       } else if (team.includes("강남팀")) {
-        color = "#00c04b";
+        color = colors.green;
       } else if (team.includes("강북팀")) {
-        color = "#0019f4";
+        color = colors.blue;
       } else {
         return;
       }
 
-      // 좌표 키 (소수점 6자리)
       const key = lat.toFixed(6) + "," + lng.toFixed(6);
       if (!coordGroups[key]) {
         coordGroups[key] = {
@@ -315,7 +314,6 @@
       coordGroups[key].entries.push(row);
     });
 
-    // 그룹 내 entries 승강기번호 빠른 순 정렬
     Object.values(coordGroups).forEach(group => {
       group.entries.sort((a,b) => {
         const aNum = parseInt((a[idx.wNum]||"").replace(/\D/g,"").padStart(7,"0"));
@@ -324,7 +322,10 @@
       });
     });
 
-    // 마커 생성
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    markerData = [];
+
     Object.values(coordGroups).forEach(group => {
       const {lat, lng, color, entries} = group;
       const count = entries.length;
@@ -344,8 +345,9 @@
         const expire = row[idx.expire] || "";
         const biTongEquip = row[idx.biTongEquip] || "";
 
+        // 7자리 숫자 맞춤 - 앞에 0 붙임
         const wNumPadded = wRaw.toString().replace(/\D/g, '').padStart(7, "0");
-        // 네이버지도 앱 바로 열기 링크 (앱 실행 스킴 적용)
+
         const nmapLink = `nmap://search?query=${encodeURIComponent(addr)}`;
 
         const dMinusRaw = calcDateDiff(expire);
@@ -363,7 +365,7 @@
 
         popupParts.push(`
           <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wNumPadded}" target="_blank" rel="noopener noreferrer" style="color:black; text-decoration:none;">
-          ${siteName} ${formatWNum(wRaw)}</a></strong><br/>
+          ${siteName} (${wNumPadded})</a></strong><br/>
           <a href="${nmapLink}" target="_blank" rel="noopener noreferrer" style="color:black;">${addr}</a><br/>
           📞 ${contact}<br/>
           특이사항: ${special}<br/>
@@ -382,7 +384,6 @@
 
       const markerSize = 18;
 
-      // 숫자 라벨: 같은 주소 2개 이상일 때만 표시, letter-spacing 적용됨
       const countLabel = showCount
         ? `<div class="marker-label" style="
             width: ${markerSize}px;
@@ -400,13 +401,12 @@
             border-radius: 50%;
             white-space: nowrap;
             letter-spacing: 2px;
-          "> ${count}</div>` // 숫자 앞에 공백 U+00A0 (non-breaking space) 넣음
+          "> ${count}</div>`
         : "";
 
-      function createMarkerHtml(color, opacity = 1) {
-        // opacity 반영
+      function createMarkerHtml(color) {
         return `
-          <div style="position: relative; width: ${markerSize}px; height: ${markerSize}px; opacity: ${opacity};">
+          <div style="position: relative; width: ${markerSize}px; height: ${markerSize}px;">
             <div style="
               background-color: ${color};
               width: ${markerSize}px;
@@ -420,14 +420,12 @@
           </div>`;
       }
 
-      let markerColor = color;
-
-      // 일단 기본 불투명도 1로 설정 후 updateMarkerHighlighting 에서 조절
       const icon = L.divIcon({
-        html: createMarkerHtml(markerColor, 1),
+        html: createMarkerHtml(color),
         iconSize: [markerSize, markerSize],
         iconAnchor: [markerSize / 2, markerSize / 2],
-        popupAnchor: [0, -markerSize / 2]
+        popupAnchor: [0, -markerSize / 2],
+        className: ""
       });
 
       const marker = L.marker([lat, lng], { icon: icon })
@@ -438,8 +436,7 @@
       markerData.push({
         marker,
         popupHtmlOriginal: popupHtmlRaw,
-        baseColor: markerColor,
-        baseOpacity: (markerColor === grayMarkerBaseColor) ? 0.5 : 1,
+        baseColor: color,
         entries,
         createMarkerHtml,
         markerSize
@@ -454,19 +451,14 @@
     let cleanDateStr = dateStr
       .replace(/[^\d\-]/g, '')
       .replace(/-{2,}/g, '-');
-
-    if(/^\d{8}$/.test(cleanDateStr)) {
+    if (/^\d{8}$/.test(cleanDateStr)) {
       cleanDateStr = cleanDateStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
     }
-
-    const today = new Date();
-    const target = new Date(cleanDateStr);
-    if (isNaN(target)) return "";
-
-    const diffTime = target.getTime() - today.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    return diffDays >= 0 ? `D-${diffDays}` : `D+${-diffDays}`;
+    const date = new Date(cleanDateStr);
+    if (isNaN(date)) return "";
+    const now = new Date();
+    const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return (diff >= 0 ? "-" : "+") + Math.abs(diff);
   }
 
   function calcDateDiffNumber(dateStr) {
@@ -474,145 +466,92 @@
     let cleanDateStr = dateStr
       .replace(/[^\d\-]/g, '')
       .replace(/-{2,}/g, '-');
-
-    if(/^\d{8}$/.test(cleanDateStr)) {
+    if (/^\d{8}$/.test(cleanDateStr)) {
       cleanDateStr = cleanDateStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
     }
-
-    const today = new Date();
-    const target = new Date(cleanDateStr);
-    if (isNaN(target)) return null;
-
-    const diffTime = target.getTime() - today.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    const date = new Date(cleanDateStr);
+    if (isNaN(date)) return null;
+    const now = new Date();
+    const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
   }
 
-  function formatWNum(numStr) {
-    const numOnly = numStr.toString().replace(/\D/g, '').padStart(7, "0");
-    return numOnly.slice(0,4) + "-" + numOnly.slice(4);
-  }
-
-  function isValidDate(dateStr) {
-    if (!dateStr) return false;
-    let cleanDateStr = dateStr
-      .replace(/[^\d\-]/g, '')
-      .replace(/-{2,}/g, '-');
-    if(/^\d{8}$/.test(cleanDateStr)) {
-      cleanDateStr = cleanDateStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+  function isValidDate(str) {
+    if (!str) return false;
+    let cleanStr = str.replace(/[^\d\-]/g, '').replace(/-{2,}/g, '-');
+    if (/^\d{8}$/.test(cleanStr)) {
+      cleanStr = cleanStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
     }
-    const d = new Date(cleanDateStr);
+    const d = new Date(cleanStr);
     return !isNaN(d);
   }
 
-  // 검색어 포함 여부 (대소문자 무시)
-  // 전화번호 검색도 포함하도록 공백/-, () 무시한 텍스트 비교
-  // 모든 컬럼 텍스트 검색 대상 확장
-  function searchMatch(row, query) {
-    if (!query) return false;
-    const cleanQuery = query.toLowerCase().replace(/[\s\-\(\)]/g,"");
-
-    // 검색 대상 컬럼 인덱스
-    const searchFields = [
-      idx.address, idx.contact, idx.siteName,
-      idx.model, idx.fan, idx.biTongNum, idx.biTongEquip, idx.team,
-      idx.checkDate, idx.expire, idx.wNum
-    ];
-    for (const fieldIdx of searchFields) {
-      const val = row[fieldIdx];
-      if (!val) continue;
-      const cleanVal = val.toString().toLowerCase().replace(/[\s\-\(\)]/g,"");
-      if (cleanVal.includes(cleanQuery)) {
-        return true;
-      }
-    }
-    return false;
+  function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  // 검색어 텍스트 빨간색 강조
-  function highlightText(text, query) {
-    if (!query) return text;
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escapedQuery, 'gi');
-    return text.replace(regex, match => `<span class="highlight-text">${match}</span>`);
-  }
-
+  // 검색어 기준 마커 색상 변경 및 팝업 내용 하이라이트, zIndex 조절
   function updateMarkerHighlighting() {
-    const query = searchInput.value.trim().toLowerCase();
+    const keywordRaw = searchInput.value.trim();
+    const keyword = keywordRaw.replace(/\s+/g, "");
+    if (!keyword) {
+      // 검색어 없으면 원래 색상으로
+      markerData.forEach(d => {
+        const html = d.createMarkerHtml(d.baseColor);
+        d.marker.setIcon(L.divIcon({
+          html,
+          iconSize: [d.markerSize, d.markerSize],
+          iconAnchor: [d.markerSize / 2, d.markerSize / 2],
+          popupAnchor: [0, -d.markerSize / 2],
+          className: ""
+        }));
+        d.marker.setZIndexOffset(0);
+        // 원래 팝업 내용 복원
+        d.marker.getPopup().setContent(d.popupHtmlOriginal);
+      });
+      return;
+    }
 
-    // 검사필요 체크 상태
-    const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
-    const inspectionNeededCheckedNow = checkedTeams.includes("검사필요");
+    // 정규표현식 준비 (한글, 영문, 숫자 모두 검색 가능하게 공백 제외한 keyword 그대로)
+    const reg = new RegExp("(" + escapeRegExp(keyword) + ")", "gi");
 
-    markerData.forEach(({marker, baseColor, baseOpacity, popupHtmlOriginal, entries, createMarkerHtml, markerSize}) => {
-      let matchedSearch = false;
-      let matchedFilter = false;
+    markerData.forEach(d => {
+      // 팝업 내용에 검색어 하이라이트
+      let highlighted = d.popupHtmlOriginal.replace(reg, `<span style="background-color: yellow; color: black; font-weight: 700;">$1</span>`);
 
-      // 검색어 매칭 여부
-      if(query) {
-        matchedSearch = entries.some(row => searchMatch(row, query));
+      // X열(승강기번호)을 7자리 0붙임 처리 후 팝업에 이미 적용되어 있음.
+
+      // 팝업 내용 업데이트
+      d.marker.getPopup().setContent(highlighted);
+
+      // 팝업 내용에 검색어가 포함되면 강조색(주황) 마커로 변경, zIndex 높임
+      const plainText = d.entries.map(r => Object.values(r).join("")).join(" ");
+      if (plainText.replace(/\s+/g, "").toLowerCase().includes(keyword.toLowerCase())) {
+        // 검색 매칭 색상 주황
+        const highlightColor = colors.orange;
+        const html = d.createMarkerHtml(highlightColor);
+        d.marker.setIcon(L.divIcon({
+          html,
+          iconSize: [d.markerSize, d.markerSize],
+          iconAnchor: [d.markerSize / 2, d.markerSize / 2],
+          popupAnchor: [0, -d.markerSize / 2],
+          className: ""
+        }));
+        d.marker.setZIndexOffset(1000); // 최상위로
       } else {
-        matchedSearch = true; // 검색어 없으면 기본 통과
-      }
-
-      // 검사필요 필터 여부
-      if(inspectionNeededCheckedNow) {
-        // 검사필요 체크면 만료일 60일 이내인 경우만 통과
-        matchedFilter = entries.some(row => {
-          const expire = row[idx.expire] || "";
-          const dDayNum = calcDateDiffNumber(expire);
-          return dDayNum !== null && dDayNum <= 60;
-        });
-      } else {
-        // 검사필요 체크 안 하면 팀 필터 조건에 포함되는 경우만 통과
-        matchedFilter = entries.some(row => {
-          const team = row[idx.team] || "";
-          return checkedTeams.some(t => t !== "검사필요" && team.includes(t));
-        });
-      }
-
-      // 최종 표시 조건
-      const isVisible = matchedSearch && matchedFilter;
-
-      // 불투명도 결정
-      let opacity = 1;
-      // 회색 마커(기본 baseOpacity)인 경우 무조건 0.5 (기본 회색 + 투명도)
-      if(baseColor === grayMarkerBaseColor) {
-        opacity = 0.5;
-      }
-      // 조건 미충족 시 투명도 0.5 적용
-      if(!isVisible) {
-        opacity = 0.5;
-      }
-
-      // 마커 색상은 기본 색상 유지, opacity만 조절
-      const iconHtml = createMarkerHtml(baseColor, opacity);
-      marker.setIcon(L.divIcon({
-        className: "",
-        html: iconHtml,
-        iconSize: [markerSize, markerSize],
-        iconAnchor: [markerSize / 2, markerSize / 2],
-        popupAnchor: [0, -markerSize / 2]
-      }));
-
-      // 팝업 내용도 검색어 매칭 시 하이라이트 적용
-      if(matchedSearch && query) {
-        let newPopup = popupHtmlOriginal;
-        entries.forEach(row => {
-          for (const colIdx of Object.values(idx)) {
-            if (!row[colIdx]) continue;
-            const origText = row[colIdx];
-            const highlighted = highlightText(origText, query);
-            if (highlighted !== origText) {
-              const safeOrigText = origText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const reg = new RegExp(safeOrigText, 'g');
-              newPopup = newPopup.replace(reg, highlighted);
-            }
-          }
-        });
-        marker.setPopupContent(newPopup);
-      } else {
-        marker.setPopupContent(popupHtmlOriginal);
+        // 매칭 안되면 기본색 + 낮은 투명도(회색이면 더 투명하게)
+        let base = d.baseColor;
+        // 회색 기본인 경우 투명도 더 높게 조정 (50%)
+        if(base === colors.gray) base = colors.gray75;
+        const html = d.createMarkerHtml(base);
+        d.marker.setIcon(L.divIcon({
+          html,
+          iconSize: [d.markerSize, d.markerSize],
+          iconAnchor: [d.markerSize / 2, d.markerSize / 2],
+          popupAnchor: [0, -d.markerSize / 2],
+          className: ""
+        }));
+        d.marker.setZIndexOffset(0);
       }
     });
   }
