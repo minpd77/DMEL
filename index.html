@@ -1,22 +1,51 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <title>Kakao Map Example</title>
+  <meta charset="UTF-8" />
+  <title>OpenStreetMap + Leaflet on GitHub Pages</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-sA+7QtHZh08d9FihsyR0ST2T8GLp9ANb+3p+Lv7t+4U="
+    crossorigin=""
+  />
   <style>
-    #map { width: 100vw; height: 100vh; }
+    #map {
+      height: 100vh;
+      width: 100vw;
+      margin: 0;
+      padding: 0;
+    }
+    body, html {
+      margin: 0;
+      height: 100%;
+    }
   </style>
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=1eb365b688f9a9c87728c12d38e1756b"></script>
 </head>
 <body>
   <div id="map"></div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-o9N1j6i/4OK7RFhOiU94LM0jI6tMz9bP+FEXT9pMJ0k="
+    crossorigin=""
+  ></script>
   <script>
-    var mapContainer = document.getElementById('map');
-    var mapOption = {
-      center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울 시청 좌표
-      level: 5
-    };
-    var map = new kakao.maps.Map(mapContainer, mapOption);
+    // 서울 시청 좌표로 초기 지도 세팅
+    const map = L.map('map').setView([37.5665, 126.978], 13);
+
+    // OpenStreetMap 타일 레이어 추가
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    // 마커 추가
+    L.marker([37.5665, 126.978])
+      .addTo(map)
+      .bindPopup('서울 시청')
+      .openPopup();
   </script>
 </body>
 </html>
