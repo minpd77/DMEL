@@ -1,18 +1,9 @@
-name: Deploy to GitHub Pages
+env:
+  NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+  NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
 
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
+steps:
+  - name: Replace NAVER_CLIENT_ID and NAVER_CLIENT_SECRET
+    run: |
+      sed -i "s/NAVER_CLIENT_ID/${NAVER_CLIENT_ID}/g" index.html
+      sed -i "s/NAVER_CLIENT_SECRET/${NAVER_CLIENT_SECRET}/g" index.html
