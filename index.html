@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<title>지도와 현장 표시</title>
+<title>대명엘리베이터(주) 현장</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link
   rel="stylesheet"
@@ -39,7 +39,7 @@
     line-height: 1;
     border-radius: 50%;
     white-space: nowrap;
-    letter-spacing: 2px; /* 숫자 간격 넓힘 */
+    letter-spacing: 2px;
   }
   .team-filter {
     position: fixed;
@@ -55,6 +55,8 @@
     font-size: 14px;
     overflow-wrap: break-word;
     word-break: break-word;
+    max-height: 80vh;
+    overflow-y: auto;
   }
   .team-filter label {
     display: block;
@@ -64,7 +66,9 @@
   #searchBox {
     position: fixed;
     bottom: 10px;
-    left: 10px;  /* 왼쪽 하단 위치 유지 */
+    left: 10px;
+    max-width: 280px;
+    width: calc(100vw - 40px); /* 좌우 10px 여백 제외한 화면 가로 폭 최대 */
     max-width: 280px;
     background: white;
     padding: 6px 10px;
@@ -76,18 +80,29 @@
     word-break: break-word;
   }
   #searchInput {
-    width: 220px;
+    width: 100%;
+    box-sizing: border-box;
     padding: 4px 8px;
     font-size: 14px;
     border: 1px solid #ccc;
     border-radius: 4px;
   }
   #searchClear {
-    margin-left: 6px;
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
     cursor: pointer;
     font-weight: bold;
     color: #999;
     user-select: none;
+  }
+  #searchBox {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    max-width: 280px;
+    width: calc(100vw - 40px);
   }
   #locationBtn {
     position: fixed;
@@ -118,12 +133,37 @@
     color: red !important;
     font-weight: 700;
   }
+
+  /* 모바일 기기에서 필터, 검색창 위치 조정 */
+  @media (max-width: 480px) {
+    .team-filter {
+      top: auto;
+      bottom: 60px;
+      right: 10px;
+      max-width: 90vw;
+      max-height: 30vh;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    #searchBox {
+      bottom: 10px;
+      left: 10px;
+      max-width: 90vw;
+      width: calc(100vw - 40px);
+    }
+    #locationBtn {
+      bottom: 10px;
+      right: 10px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+  }
 </style>
 </head>
 <body>
-<h2>현장 위치 지도</h2>
+<h2>대명엘리베이터(주) 현장</h2>
 
-<div class="team-filter">
+<div class="team-filter" aria-label="팀 필터">
   <label><input type="checkbox" value="강남팀" checked> 강남팀</label>
   <label><input type="checkbox" value="강북팀" checked> 강북팀</label>
   <label><input type="checkbox" value="검사필요"> 검사필요</label>
@@ -131,12 +171,12 @@
 
 <div id="map"></div>
 
-<div id="searchBox">
-  <input type="text" id="searchInput" placeholder="검색어 입력" />
-  <span id="searchClear" title="검색어 지우기">×</span>
+<div id="searchBox" role="search">
+  <input type="text" id="searchInput" placeholder="검색어 입력" aria-label="검색어 입력" />
+  <span id="searchClear" title="검색어 지우기" aria-label="검색어 지우기">×</span>
 </div>
 
-<div id="locationBtn" title="내 현재 위치 표시">
+<div id="locationBtn" title="내 현재 위치 표시" role="button" tabindex="0">
   <div class="red-dot"></div> 내 위치
 </div>
 
@@ -309,8 +349,8 @@
         const biTongEquip = row[idx.biTongEquip] || "";
 
         const wNumPadded = wRaw.toString().replace(/\D/g, '').padStart(7, "0");
-        // 네이버지도 앱 바로 열기 링크 → 웹브라우저용 네이버 지도 링크로 변경
-        const nmapLink = `https://map.naver.com/v5/search/${encodeURIComponent(addr)}`;
+        // 네이버지도 앱 바로 열기 링크 (nmap:// 로 바로 앱 실행)
+        const nmapLink = `nmap://search?query=${encodeURIComponent(addr)}`;
 
         const dMinusRaw = calcDateDiff(expire);
         const dMinus = dMinusRaw ? dMinusRaw.replace(/--+/g, "-") : "";
@@ -364,7 +404,7 @@
             border-radius: 50%;
             white-space: nowrap;
             letter-spacing: 2px;
-          "> ${count}</div>`
+          "> ${count}</div>` // 숫자 앞에 공백 U+00A0 (non-breaking space) 넣음
         : "";
 
       function createMarkerHtml(color) {
@@ -470,10 +510,14 @@
     return !isNaN(d);
   }
 
+  // 검색어 포함 여부 (대소문자 무시)
+  // 전화번호 검색도 포함하도록 공백/-, () 무시한 텍스트 비교
+  // 모든 컬럼 텍스트 검색 대상 확장
   function searchMatch(row, query) {
     if (!query) return false;
     const cleanQuery = query.toLowerCase().replace(/[\s\-\(\)]/g,"");
 
+    // 검색 대상 컬럼 인덱스
     const searchFields = [
       idx.address, idx.contact, idx.siteName,
       idx.model, idx.fan, idx.biTongNum, idx.biTongEquip, idx.team,
@@ -490,6 +534,7 @@
     return false;
   }
 
+  // 검색어 텍스트 빨간색 강조
   function highlightText(text, query) {
     if (!query) return text;
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -525,28 +570,29 @@
             const origText = row[colIdx];
             const highlighted = highlightText(origText, query);
             if (highlighted !== origText) {
-              const safeOrig = origText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const regex = new RegExp(safeOrig, "g");
-              newPopup = newPopup.replace(origText, highlighted);
+              const safeOrigText = origText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const reg = new RegExp(safeOrigText, 'g');
+              newPopup = newPopup.replace(reg, highlighted);
             }
           }
         });
-        marker.bindPopup(newPopup);
+
+        marker.setPopupContent(newPopup);
       } else {
         marker.setZIndexOffset(0);
+        const iconHtml = createMarkerHtml(baseColor);
         marker.setIcon(L.divIcon({
           className: "",
-          html: createMarkerHtml(baseColor),
+          html: iconHtml,
           iconSize: [markerSize, markerSize],
           iconAnchor: [markerSize / 2, markerSize / 2],
           popupAnchor: [0, -markerSize / 2]
         }));
-        marker.bindPopup(popupHtmlOriginal);
+        marker.setPopupContent(popupHtmlOriginal);
       }
     });
   }
 
-  // 초기 실행
   fetchTSVandPlot();
 
 </script>
