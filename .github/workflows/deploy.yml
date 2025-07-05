@@ -14,7 +14,7 @@ jobs:
 
       - name: Replace secrets in files
         run: |
-          sed -i "s/1eb365b688f9a9c87728c12d38e1756b/${{ secrets.KAKAO_JAVASCRIPT_KEY }}/g" index.html
+          sed -i "s/YOUR_REST_API_KEY/${{ secrets.KAKAO_REST_API_KEY }}/g" index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
