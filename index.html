@@ -1,122 +1,221 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>Leaflet + TSV 마커 및 조건별 색상</title>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <style>
-    #map { height: 600px; width: 100%; }
-    .popup-content { font-size: 14px; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>오픈스트리트맵 지도 + 마커</title>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-sA+4w6b0g53veTn3pQoDjHya79TyGxnzYaZa0n0w3oY="
+  crossorigin=""
+/>
+<style>
+  #map {
+    width: 100vw;
+    height: 100vh;
+  }
+  .custom-popup {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .custom-popup a {
+    color: blue;
+    text-decoration: underline;
+  }
+</style>
 </head>
 <body>
-  <div id="map"></div>
+<div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    const map = L.map('map').setView([37.5665, 126.978], 12);
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-o9N1j6D+2/k9fQ+I7rjN1D6bVV2VFK3zFw4g+v0yYZo="
+  crossorigin=""
+></script>
+<script>
+  // 구글 스프레드시트 TSV 데이터 URL
+  const TSV_URL =
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=tsv";
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
+  // 팀별 색상 조건
+  function getMarkerColor(team, hasDate) {
+    if (hasDate) return "gray"; // 날짜 있으면 회색
+    if (team === "강남팀") return "green";
+    if (team === "강북팀") return "blue";
+    return "red"; // 다른 팀 또는 빈값일 경우 빨간색
+  }
 
-    const tsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=tsv';
+  // 숫자를 7자리로 앞에 0채우기
+  function padSeven(numStr) {
+    return numStr.padStart(7, "0");
+  }
 
-    function parseTSV(text) {
-      return text.trim().split('\n').map(line => line.split('\t'));
-    }
+  // QR코드 링크 만들기 (w열 7자리 숫자 연속)
+  function makeQrLink(numStr) {
+    const cleanNum = numStr.replace(/-/g, "");
+    const padded = padSeven(cleanNum);
+    return `https://m.elevator.go.kr/qrcode.do?no_plaq=${padded}`;
+  }
 
-    // W열 숫자를 7자리 '0000-000' 형식으로 변환
-    function formatW(value) {
-      if (!value) return '';
-      const num = value.toString().replace(/\D/g, ''); // 숫자만 추출
-      if (num.length <= 3) return '000-' + num.padStart(3, '0');
-      if (num.length === 7) return num.slice(0,4) + '-' + num.slice(4);
-      // 7자리 아니면 그냥 리턴
-      return value;
-    }
+  // 팝업 내용 생성
+  function createPopupContent(data) {
+    /*
+      data = {
+        현장명: string,  // ag열
+        w번호: string,    // w열 (7자리 숫자, 하이픈 포함 가능)
+        주소: string,     // g열
+        연락처: string,   // x열
+        특이사항: string, // v열
+        기종: string,     // aa열
+        Fan: string,      // ab열
+        비상통화: string, // z열
+        유효기간: string, // ad열
+        팀: string,       // s열 (강남팀, 강북팀 외 무시)
+        날짜존재: boolean // k열 날짜 존재 여부
+      }
+    */
 
-    fetch(tsvUrl)
-      .then(res => res.text())
-      .then(text => {
-        const rows = parseTSV(text);
+    const qrLink = makeQrLink(data.w번호);
 
-        // 열 인덱스 (0부터)
-        const COLS = {
-          lat: 34,  // AI
-          lng: 35,  // AJ
-          af: 31,   // AF
-          w: 22,    // W
-          aa: 26,   // AA
-          ab: 27,   // AB
-          g: 6,     // G
-          x: 23,    // X
-          z: 25,    // Z
-          ad: 29,   // AD
-          s: 18,    // S
-          k: 10     // K
+    // w번호 하이픈 포함 3-4자리로 출력 (ex: 0114-421)
+    const wClean = data.w번호.replace(/-/g, "").padStart(7, "0");
+    const wFormatted = wClean.slice(0, 4) + "-" + wClean.slice(4);
+
+    return `
+      <div class="custom-popup">
+        <b><a href="${qrLink}" target="_blank">${data.현장명} ${wFormatted}</a></b><br/>
+        ${data.주소}<br/>
+        📞: ${data.연락처}<br/>
+        특이사항: ${data.특이사항}<br/>
+        기종: ${data.기종}<br/>
+        Fan: ${data.Fan}<br/>
+        비상통화: ${data.비상통화}<br/>
+        유효기간: ${data.유효기간}<br/>
+      </div>
+    `;
+  }
+
+  async function fetchTsvData(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("TSV 데이터 로드 실패");
+    const tsvText = await res.text();
+    return tsvText.trim().split("\n").map(line => line.split("\t"));
+  }
+
+  function parseDateExistence(dateStr) {
+    // 간단하게 빈 문자열 아닌지 확인
+    return dateStr && dateStr.trim() !== "";
+  }
+
+  // 지도 초기화
+  const map = L.map("map").setView([37.5665, 126.978], 11);
+
+  // 오픈스트리트맵 타일 레이어 추가
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  // 메인 함수
+  async function main() {
+    try {
+      const rows = await fetchTsvData(TSV_URL);
+      const header = rows[0];
+      const dataRows = rows.slice(1);
+
+      // 열 인덱스 찾기 (알파벳 기준)
+      // A열: 0, B열:1 ... AG열: 32, W열: 22, G열:6 등
+      const colIndex = {
+        위도: 1, // B열
+        경도: 2, // C열 (만약 경도 다르면 바꿔주세요)
+        현장명: 32, // AG열
+        w번호: 22, // W열
+        주소: 6, // G열
+        연락처: 23, // X열
+        특이사항: 21, // V열
+        기종: 26, // AA열
+        Fan: 27, // AB열
+        비상통화: 25, // Z열
+        유효기간: 29, // AD열
+        팀: 18, // S열
+        날짜: 10 // K열
+      };
+
+      // 동일 주소 그룹핑 (주소 + 현장명) 중복 카운트
+      const addressCountMap = new Map();
+      dataRows.forEach(row => {
+        const addr = row[colIndex.주소]?.trim() || "";
+        const name = row[colIndex.현장명]?.trim() || "";
+        const key = addr + "||" + name;
+        addressCountMap.set(key, (addressCountMap.get(key) || 0) + 1);
+      });
+
+      dataRows.forEach(row => {
+        // 필수 위도/경도, 주소, 현장명 체크
+        const lat = parseFloat(row[colIndex.위도]);
+        const lng = parseFloat(row[colIndex.경도]);
+        const addr = row[colIndex.주소]?.trim();
+        const name = row[colIndex.현장명]?.trim();
+
+        if (
+          isNaN(lat) ||
+          isNaN(lng) ||
+          !addr ||
+          !name
+        ) return;
+
+        // 팀은 강남팀/강북팀 외 무시
+        const teamRaw = row[colIndex.팀]?.trim() || "";
+        const team =
+          teamRaw === "강남팀" || teamRaw === "강북팀" ? teamRaw : "";
+
+        // 날짜 존재 여부
+        const hasDate = parseDateExistence(row[colIndex.날짜]);
+
+        // 색상 결정
+        const markerColor = getMarkerColor(team, hasDate);
+
+        // 중복 카운트
+        const key = addr + "||" + name;
+        const count = addressCountMap.get(key) || 1;
+
+        // 마커 생성
+        const marker = L.circleMarker([lat, lng], {
+          color: markerColor,
+          radius: 8,
+          fillOpacity: 0.8
+        }).addTo(map);
+
+        // 팝업 내용 준비
+        const data = {
+          현장명: name,
+          w번호: row[colIndex.w번호]?.trim() || "",
+          주소: addr,
+          연락처: row[colIndex.연락처]?.trim() || "",
+          특이사항: row[colIndex.특이사항]?.trim() || "",
+          기종: row[colIndex.기종]?.trim() || "",
+          Fan: row[colIndex.Fan]?.trim() || "",
+          비상통화: row[colIndex.비상통화]?.trim() || "",
+          유효기간: row[colIndex.유효기간]?.trim() || "",
+          팀: team,
+          날짜존재: hasDate
         };
 
-        const data = rows.slice(1); // 2행부터 처리
+        // 마커 라벨 (중복이면 숫자 포함)
+        const labelText = count > 1 ? `${name} (${count})` : name;
 
-        data.forEach(row => {
-          const lat = parseFloat(row[COLS.lat]);
-          const lng = parseFloat(row[COLS.lng]);
-          if (!lat || !lng) return;
+        marker.bindPopup(createPopupContent(data), { maxWidth: 300 });
+        marker.bindTooltip(labelText, { permanent: true, direction: "top" });
+      });
+    } catch (e) {
+      console.error(e);
+      alert("데이터를 불러오거나 처리하는 중 오류가 발생했습니다.");
+    }
+  }
 
-          // 마커 색상 조건
-          const team = row[COLS.s]?.trim();
-          const dateVal = row[COLS.k]?.trim();
-          let color = 'blue'; // 기본 파란색
-
-          if (dateVal) {
-            color = 'gray'; // 날짜가 있으면 회색 우선
-          } else if (team === '강남팀') {
-            color = 'green';
-          } else if (team === '강북팀') {
-            color = 'blue';
-          }
-
-          // 마커 아이콘 커스텀 (컬러 원형)
-          const markerHtml = `<div style="
-            background-color: ${color};
-            width: 16px; height: 16px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 3px #555;
-          "></div>`;
-
-          const myIcon = L.divIcon({
-            html: markerHtml,
-            className: '',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
-          });
-
-          const marker = L.marker([lat, lng], { icon: myIcon }).addTo(map);
-
-          // 팝업 내용
-          const popupHtml = `
-            <div class="popup-content">
-              <b>현장명 (AF):</b> ${row[COLS.af] || ''} <br/>
-              <b>W (7자리):</b> ${formatW(row[COLS.w])} <br/>
-              <b>AA:</b> ${row[COLS.aa] || ''} <br/>
-              <b>AB:</b> ${row[COLS.ab] || ''} <br/>
-              <b>G:</b> ${row[COLS.g] || ''} <br/>
-              <b>X:</b> ${row[COLS.x] || ''} <br/>
-              <b>Z:</b> ${row[COLS.z] || ''} <br/>
-              <b>AD:</b> ${row[COLS.ad] || ''}
-            </div>
-          `;
-
-          marker.bindPopup(popupHtml);
-        });
-      })
-      .catch(e => alert('TSV 불러오기 실패: ' + e));
-  </script>
+  main();
+</script>
 </body>
 </html>
