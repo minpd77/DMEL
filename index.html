@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <title>Leaflet Map Test</title>
+  <meta charset="UTF-8" />
+  <title>Leaflet + 노션동기화 시트 마커 표시</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -11,6 +11,7 @@
     #map {
       height: 100vh;
       width: 100vw;
+      margin: 0; padding: 0;
     }
     body, html {
       margin: 0; padding: 0; height: 100%;
@@ -22,17 +23,60 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([37.5665, 126.9780], 13);
+    // 지도 초기화 (서울 시청 중심)
+    const map = L.map('map').setView([37.5665, 126.978], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    L.marker([37.5665, 126.9780]).addTo(map)
-      .bindPopup('서울 시청')
-      .openPopup();
+    // 노션동기화 시트 CSV 공개 링크
+    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=csv';
+
+    // CSV 파싱 함수
+    function parseCSV(text) {
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',');
+      const rows = lines.slice(1).map(line => line.split(','));
+      return { headers, rows };
+    }
+
+    // 컬럼 인덱스 찾기
+    function getColumnIndex(headers, colName) {
+      return headers.indexOf(colName);
+    }
+
+    fetch(csvUrl)
+      .then(res => res.text())
+      .then(text => {
+        const { headers, rows } = parseCSV(text);
+
+        const latIdx = getColumnIndex(headers, 'ai');
+        const lngIdx = getColumnIndex(headers, 'aj');
+        const nameIdx = getColumnIndex(headers, 'af');
+
+        if (latIdx === -1 || lngIdx === -1 || nameIdx === -1) {
+          alert('CSV에 ai, aj, af 열이 없습니다.');
+          return;
+        }
+
+        rows.forEach(row => {
+          const lat = parseFloat(row[latIdx]);
+          const lng = parseFloat(row[lngIdx]);
+          const name = row[nameIdx];
+
+          if (!isNaN(lat) && !isNaN(lng)) {
+            L.marker([lat, lng])
+              .addTo(map)
+              .bindPopup(name || '이름 없음');
+          }
+        });
+      })
+      .catch(e => {
+        alert('CSV 불러오기 실패: ' + e);
+      });
   </script>
 </body>
 </html>
