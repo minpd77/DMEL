@@ -2,30 +2,21 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Kakao Map Simple Test</title>
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_JAVASCRIPT_KEY"></script>
+  <title>Kakao Map Example</title>
   <style>
-    #map { width:100vw; height:100vh; }
+    #map { width: 100vw; height: 100vh; }
   </style>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_JAVASCRIPT_KEY"></script>
 </head>
 <body>
   <div id="map"></div>
   <script>
     var mapContainer = document.getElementById('map');
     var mapOption = {
-      center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울시청 좌표
+      center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울 시청 좌표
       level: 5
     };
-
     var map = new kakao.maps.Map(mapContainer, mapOption);
-
-    var markerPosition = new kakao.maps.LatLng(37.5665, 126.9780);
-
-    var marker = new kakao.maps.Marker({
-      position: markerPosition
-    });
-
-    marker.setMap(map);
   </script>
 </body>
 </html>
