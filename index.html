@@ -1,23 +1,93 @@
-name: Deploy GitHub Pages
+<script>
+  async function loadCSVAndAddMarkers() {
+    const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=csv";
+    
+    const response = await fetch(csvUrl);
+    const text = await response.text();
+    const rows = text.trim().split("\n").map(row => row.split(","));
 
-on:
-  push:
-    branches:
-      - main
+    // 첫 행은 헤더니까 제외
+    const data = rows.slice(1);
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    const markerMap = new Map();
 
-      - name: Replace secret
-        run: |
-          sed -i "s/YOUR_JAVASCRIPT_KEY/${{ secrets.YOUR_JAVASCRIPT_KEY }}/g" index.html
+    data.forEach((row, index) => {
+      const address = row[6]?.trim();   // G열: 주소
+      const label = row[31]?.trim();    // AF열: 마커 이름
+      const colorRef = row[18]?.trim(); // S열: 날짜
+      const key = `${address}_${label}`;
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
+      if (!address || !label) return;
+
+      if (!markerMap.has(key)) {
+        markerMap.set(key, {
+          address,
+          label,
+          count: 1,
+          colorRef
+        });
+      } else {
+        markerMap.get(key).count += 1;
+      }
+    });
+
+    // 주소를 좌표로 변환하고 마커 표시
+    for (const [key, info] of markerMap.entries()) {
+      const coords = await getCoordsFromAddress(info.address);
+      if (!coords) continue;
+
+      const { label, count, colorRef } = info;
+
+      let color = "#00BFFF"; // 기본 파란색
+      if (colorRef) {
+        color = "gray"; // 날짜 있으면 회색
+      } else if (label.includes("강남")) {
+        color = "green";
+      }
+
+      const content = document.createElement("div");
+      content.style.background = color;
+      content.style.color = "white";
+      content.style.padding = "4px 8px";
+      content.style.borderRadius = "8px";
+      content.style.fontSize = "13px";
+      content.innerText = count > 1 ? `${label} (${count})` : label;
+
+      const marker = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(coords.lat, coords.lng),
+        content: content,
+        yAnchor: 1
+      });
+      marker.setMap(map);
+    }
+  }
+
+  // 주소 → 좌표 변환
+  async function getCoordsFromAddress(address) {
+    const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: "KakaoAK YOUR_REST_API_KEY"
+      }
+    });
+
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.documents && json.documents.length > 0) {
+      const loc = json.documents[0];
+      return { lat: loc.y, lng: loc.x };
+    }
+    return null;
+  }
+
+  // 지도 초기화 후 마커 로드
+  window.onload = function () {
+    const mapContainer = document.getElementById('map');
+    const mapOption = {
+      center: new kakao.maps.LatLng(37.5665, 126.9780),
+      level: 5
+    };
+    window.map = new kakao.maps.Map(mapContainer, mapOption);
+    loadCSVAndAddMarkers();
+  };
+</script>
