@@ -2,14 +2,21 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>카카오 지도 프로젝트</title>
-  <link rel="stylesheet" href="styles.css" />
-  <!-- 카카오 지도 API 스크립트 -->
-  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1eb365b688f9a9c87728c12d38e1756b&libraries=services"></script>
+  <title>카카오 지도 테스트</title>
+  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1eb365b688f9a9c87728c12d38e1756b"></script>
+  <style>
+    #map {width:100%;height:600px;}
+  </style>
 </head>
 <body>
-  <h1>카카오 지도 테스트</h1>
-  <div id="map" style="width:100%; height:600px;"></div>
-  <script src="scripts.js"></script>
+  <div id="map"></div>
+  <script>
+    var mapContainer = document.getElementById('map');
+    var mapOption = {
+      center: new kakao.maps.LatLng(37.5665, 126.9780),
+      level: 3
+    };
+    var map = new kakao.maps.Map(mapContainer, mapOption);
+  </script>
 </body>
 </html>
