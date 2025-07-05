@@ -13,7 +13,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Replace secret
+      - name: Replace API Keys in index.html
         run: |
           sed -i "s/YOUR_JAVASCRIPT_KEY/${{ secrets.YOUR_JAVASCRIPT_KEY }}/g" index.html
           sed -i "s/YOUR_REST_API_KEY/${{ secrets.YOUR_REST_API_KEY }}/g" index.html
@@ -23,3 +23,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
+          publish_branch: main
