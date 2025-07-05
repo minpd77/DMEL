@@ -1,3 +1,14 @@
+알겠습니다! 아래는 깃허브 웹사이트에서 직접 HTML 파일을 새로 만들어 올리는 단계별 안내입니다.
+
+⸻
+
+깃허브에 HTML 파일 직접 올리기 (웹에서 새 파일 생성)
+	1.	깃허브 로그인 후, HTML 파일을 올릴 저장소(Repository) 로 이동하세요.
+	•	없다면 새 저장소를 생성하세요.
+	2.	저장소 메인 화면에서, 오른쪽 위 Add file 버튼 클릭 → Create new file 클릭
+	3.	파일명 입력란에 index.html 입력
+	4.	아래에 당신이 주신 HTML 전체 코드를 복사해서 붙여넣기 하세요:
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -18,8 +29,8 @@
   }
   .marker-label {
     position: absolute;
-    top: 60%;  /* 숫자 위치 약간 아래 */
-    left: 60%; /* 숫자 위치 약간 오른쪽 */
+    top: 60%;
+    left: 60%;
     transform: translate(-50%, -50%);
     color: white;
     font-weight: 700;
@@ -128,33 +139,30 @@
   }).addTo(map);
 
   const idx = {
-    coord: 1,       // B열: 위도,경도 (콤마 구분)
-    address: 7,     // H열: 주소
-    special: 21,    // V열: 특이사항
-    checkDate: 11,  // L열: 점검
-    wNum: 23,       // X열: 비통번호 (7자리 숫자)
-    contact: 24,    // Y열: 연락처
-    model: 27,      // AB열: 기종
-    fan: 28,        // AC열: Fan
-    biTongNum: 26,  // AA열: 비통번호
-    expire: 30,     // AE열: 유효기간
-    siteName: 32,   // AG열: 현장명
-    team: 19        // T열: 팀명 (강남팀, 강북팀 등)
+    coord: 1,
+    address: 7,
+    special: 21,
+    checkDate: 11,
+    wNum: 23,
+    contact: 24,
+    model: 27,
+    fan: 28,
+    biTongNum: 26,
+    expire: 30,
+    siteName: 32,
+    team: 19
   };
 
   let coordGroups = {};
   let markers = [];
-  let markerData = []; // [{marker, popupHtmlOriginal, baseColor}]
+  let markerData = [];
 
-  const highlightMarkerColor = "#F6BB43"; // 주황색
+  const highlightMarkerColor = "#F6BB43";
   const highlightTextColor = "red";
 
-  // 내 위치 마커
   let currentLocationMarker = null;
-  let currentLocationAccuracyCircle = null;
 
   async function fetchTSVandPlot() {
-    // 기존 마커 제거
     markers.forEach(m => map.removeLayer(m));
     markers = [];
     markerData = [];
@@ -167,7 +175,6 @@
 
     coordGroups = {};
 
-    // 체크된 팀 가져오기
     const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
 
     data.forEach(row => {
@@ -186,11 +193,11 @@
 
       let color = "";
       if (checkDateVal && isValidDate(checkDateVal)) {
-        color = "#999999"; // 회색
+        color = "#999999";
       } else if (team.includes("강남팀")) {
-        color = "#00c04b"; // 녹색
+        color = "#00c04b";
       } else if (team.includes("강북팀")) {
-        color = "#0019f4"; // 파랑
+        color = "#0019f4";
       } else {
         return;
       }
@@ -229,7 +236,6 @@
       const dMinus = calcDateDiff(expire);
       const formattedWNum = formatWNum(wRaw);
 
-      // FAN 상태에 따른 원 모양(색상)
       let fanCircleHtml = "";
       const fanLower = fan.toLowerCase();
       if(fanLower === "on"){
@@ -292,13 +298,11 @@
     });
   }
 
-  // 날짜 문자열 한글 제거 후 파싱 + 음수 포함 D-day 출력
   function calcDateDiff(dateStr) {
     if (!dateStr) return "";
-    // '2026년 02월 07일' 같은 형식 처리용
     let cleanDateStr = dateStr
-      .replace(/[^\d\-]/g, '')   // 숫자와 '-'만 남김
-      .replace(/-{2,}/g, '-');   // 연속된 '-' 하나로 치환
+      .replace(/[^\d\-]/g, '')
+      .replace(/-{2,}/g, '-');
 
     if(/^\d{8}$/.test(cleanDateStr)) {
       cleanDateStr = cleanDateStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
@@ -321,11 +325,9 @@
     return !isNaN(new Date(d).getTime());
   }
 
-  // 검색어에 대해 팝업 텍스트 단어 완전 일치시 텍스트 빨강, 마커 주황
   function updatePopupHighlight(keyword) {
     const lowerKeyword = keyword.trim().toLowerCase();
     if (lowerKeyword === "") {
-      // 검색어 없으면 모두 원래대로
       markerData.forEach(({ marker, popupHtmlOriginal, baseColor }) => {
         if (!marker.getPopup()) return;
         marker.setPopupContent(popupHtmlOriginal);
@@ -363,11 +365,9 @@
 
       const popupTextLower = popupHtmlOriginal.toLowerCase();
 
-      // 단어 경계로 keyword 완전 일치 체크
       const keywordRegex = new RegExp(`\\b${escapeRegExp(lowerKeyword)}\\b`);
 
       if (keywordRegex.test(popupTextLower)) {
-        // 키워드 정확히 단어 단위 포함됨 → 강조
         const newHtml = popupHtmlOriginal.replace(/color:\s*black/g, `color: ${highlightTextColor}`);
         marker.setPopupContent(newHtml);
 
@@ -397,7 +397,6 @@
         marker.setIcon(newIcon);
 
       } else {
-        // 키워드 없으면 원래색상 유지
         marker.setPopupContent(popupHtmlOriginal);
 
         const countLabelMatch = marker.getIcon().options.html.match(/<div class="marker-label" style="background-color:[^"]+;">(\d+)<\/div>/);
@@ -429,12 +428,10 @@
 
   }
 
-  // 정규식 특수문자 이스케이프 함수
   function escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  // 현재 위치 표시 함수
   function locateAndMark() {
     if (!navigator.geolocation) {
       alert("이 브라우저에서는 위치 정보를 사용할 수 없습니다.");
@@ -445,11 +442,10 @@
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
 
-      // 내 위치 아이콘 - 빨간 원, 기존 마커 크기의 50%
       const redDotHtml = `
         <div style="
           background-color: red;
-          width: 9px;  /* 18px * 0.5 */
+          width: 9px;
           height: 9px;
           border-radius: 50%;
           border: 2px solid white;
@@ -476,11 +472,9 @@
     }, { enableHighAccuracy: true });
   }
 
-  // 이벤트 바인딩
   document.querySelectorAll('.team-filter input').forEach(input => {
     input.addEventListener('change', () => {
       fetchTSVandPlot().then(() => {
-        // 검색어가 있으면 검색어 기준 다시 하이라이트 적용
         updatePopupHighlight(document.getElementById('searchInput').value);
       });
     });
@@ -491,18 +485,4 @@
   const searchInput = document.getElementById("searchInput");
   const searchClear = document.getElementById("searchClear");
 
-  searchInput.addEventListener("input", () => {
-    updatePopupHighlight(searchInput.value);
-  });
-
-  searchClear.addEventListener("click", () => {
-    searchInput.value = "";
-    updatePopupHighlight("");
-    searchInput.focus();
-  });
-
-  fetchTSVandPlot();
-
-</script>
-</body>
-</html>
+  searchInput.addEventListener("input", ()
