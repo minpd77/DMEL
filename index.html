@@ -39,11 +39,13 @@
     line-height: 1;
     border-radius: 50%;
     white-space: nowrap;
+    letter-spacing: 2px; /* 숫자 간격 넓힘 */
   }
   .team-filter {
     position: fixed;
-    top: 10px;
+    top: 50%;
     right: 10px;
+    transform: translateY(-50%);
     max-width: 180px;
     background: white;
     padding: 8px 12px;
@@ -62,7 +64,7 @@
   #searchBox {
     position: fixed;
     bottom: 10px;
-    left: 10px;  /* 왼쪽 하단으로 위치 변경 */
+    left: 10px;  /* 왼쪽 하단 위치 유지 */
     max-width: 280px;
     background: white;
     padding: 6px 10px;
@@ -307,8 +309,8 @@
         const biTongEquip = row[idx.biTongEquip] || "";
 
         const wNumPadded = wRaw.toString().replace(/\D/g, '').padStart(7, "0");
-        // 네이버지도 앱 바로 열기 링크 (nmap:// 로 바로 앱 실행)
-        const nmapLink = `nmap://search?query=${encodeURIComponent(addr)}`;
+        // 네이버지도 앱 바로 열기 링크 → 웹브라우저용 네이버 지도 링크로 변경
+        const nmapLink = `https://map.naver.com/v5/search/${encodeURIComponent(addr)}`;
 
         const dMinusRaw = calcDateDiff(expire);
         const dMinus = dMinusRaw ? dMinusRaw.replace(/--+/g, "-") : "";
@@ -344,7 +346,7 @@
 
       const markerSize = 18;
 
-      // 숫자 라벨: 같은 주소 2개 이상일 때만 표시
+      // 숫자 라벨: 같은 주소 2개 이상일 때만 표시, letter-spacing 적용됨
       const countLabel = showCount
         ? `<div class="marker-label" style="
             width: ${markerSize}px;
@@ -361,7 +363,8 @@
             user-select: none;
             border-radius: 50%;
             white-space: nowrap;
-          "> ${count}</div>` // 숫자 앞에 공백 U+00A0 (non-breaking space) 넣음
+            letter-spacing: 2px;
+          "> ${count}</div>`
         : "";
 
       function createMarkerHtml(color) {
@@ -467,14 +470,10 @@
     return !isNaN(d);
   }
 
-  // 검색어 포함 여부 (대소문자 무시)
-  // 전화번호 검색도 포함하도록 공백/-, () 무시한 텍스트 비교
-  // 모든 컬럼 텍스트 검색 대상 확장
   function searchMatch(row, query) {
     if (!query) return false;
     const cleanQuery = query.toLowerCase().replace(/[\s\-\(\)]/g,"");
 
-    // 검색 대상 컬럼 인덱스
     const searchFields = [
       idx.address, idx.contact, idx.siteName,
       idx.model, idx.fan, idx.biTongNum, idx.biTongEquip, idx.team,
@@ -491,7 +490,6 @@
     return false;
   }
 
-  // 검색어 텍스트 빨간색 강조
   function highlightText(text, query) {
     if (!query) return text;
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -527,29 +525,28 @@
             const origText = row[colIdx];
             const highlighted = highlightText(origText, query);
             if (highlighted !== origText) {
-              const safeOrigText = origText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const reg = new RegExp(safeOrigText, 'g');
-              newPopup = newPopup.replace(reg, highlighted);
+              const safeOrig = origText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const regex = new RegExp(safeOrig, "g");
+              newPopup = newPopup.replace(origText, highlighted);
             }
           }
         });
-
-        marker.setPopupContent(newPopup);
+        marker.bindPopup(newPopup);
       } else {
         marker.setZIndexOffset(0);
-        const iconHtml = createMarkerHtml(baseColor);
         marker.setIcon(L.divIcon({
           className: "",
-          html: iconHtml,
+          html: createMarkerHtml(baseColor),
           iconSize: [markerSize, markerSize],
           iconAnchor: [markerSize / 2, markerSize / 2],
           popupAnchor: [0, -markerSize / 2]
         }));
-        marker.setPopupContent(popupHtmlOriginal);
+        marker.bindPopup(popupHtmlOriginal);
       }
     });
   }
 
+  // 초기 실행
   fetchTSVandPlot();
 
 </script>
