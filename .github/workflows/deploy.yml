@@ -13,7 +13,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Replace API Keys in index.html
+      - name: Replace secret
         run: |
           sed -i "s/YOUR_JAVASCRIPT_KEY/${{ secrets.YOUR_JAVASCRIPT_KEY }}/g" index.html
           sed -i "s/YOUR_REST_API_KEY/${{ secrets.YOUR_REST_API_KEY }}/g" index.html
