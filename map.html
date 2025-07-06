@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>대명엘리베이터(주) 현장</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+  />
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    #map { width: 100%; height: 90vh; }
+    .marker-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-weight: 700;
+      font-size: calc(18px * 0.8);
+      pointer-events: none;
+      user-select: none;
+      border-radius: 50%;
+      white-space: nowrap;
+      letter-spacing: 2px;
+    }
+    .team-filter {
+      position: fixed;
+      bottom: 60px;
+      right: 10px;
+      max-width: 180px;
+      background: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      z-index: 1000;
+      font-size: 14px;
+      overflow-wrap: break-word;
+      max-height: 35vh;
+      overflow-y: auto;
+    }
+    .team-filter label {
+      display: block;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+    #searchBox {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      max-width: 280px;
+      width: calc(100vw - 40px);
+      background: white;
+      padding: 6px 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      z-index: 1000;
+      font-size: 14px;
+    }
+    #searchInput {
+      width: 100%;
+      padding: 4px 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    #searchClear {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-weight: bold;
+      color: #999;
+    }
+    #locationBtn {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      color: black;
+    }
+    #locationBtn .red-dot {
+      width: 14px;
+      height: 14px;
+      background: red;
+      border-radius: 50%;
+    }
+    @media (max-width: 480px) {
+      .team-filter {
+        bottom: 60px;
+        right: 10px;
+        max-width: 90vw;
+        font-size: 13px;
+      }
+      #searchBox {
+        bottom: 10px;
+        left: 10px;
+        max-width: 90vw;
+        width: calc(100vw - 40px);
+      }
+      #locationBtn {
+        bottom: 10px;
+        right: 10px;
+        padding: 6px 10px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center;">대명엘리베이터(주) 현장</h2>
+  <div id="map"></div>
+
+  <div id="searchBox">
+    <input type="text" id="searchInput" placeholder="검색어 입력" />
+    <span id="searchClear">×</span>
+  </div>
+
+  <div id="locationBtn" title="내 위치 표시">
+    <div class="red-dot"></div> 내 위치
+  </div>
+
+  <div class="team-filter">
+    <label><input type="checkbox" value="강남팀" checked> 강남팀</label>
+    <label><input type="checkbox" value="강북팀" checked> 강북팀</label>
+    <label><input type="checkbox" value="검사필요"> 검사필요</label>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script>
+    const tsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQpveOpTjSLo3ZOFfCaoqJlknJXl0FyhmsAy7ICy-L_EsGun7Tf9uCqZbp97_yXYQwx-p_BlTpSouwn/pub?gid=381852124&single=true&output=tsv";
+
+    const map = L.map("map").setView([37.5665, 126.978], 11);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    const idx = {
+      coord: 1,
+      address: 7,
+      checkDate: 11,
+      wNum: 23,
+      contact: 24,
+      model: 27,
+      fan: 28,
+      expire: 30,
+      siteName: 32,
+      team: 19
+    };
+
+    const colors = {
+      orange: "rgba(246, 187, 67, 1)",
+      gray: "rgba(153, 153, 153, .7)",
+      gray75: "rgba(153, 153, 153, 0.5)",
+      green: "rgba(0, 192, 75, 1)",
+      blue: "rgba(0, 25, 244, 1)",
+      red: "rgba(255, 59, 59, 1)"
+    };
+
+    let markers = [], markerData = [];
+
+    document.getElementById("locationBtn").addEventListener("click", () => {
+      if (!navigator.geolocation) return alert("위치 정보를 지원하지 않음");
+      navigator.geolocation.getCurrentPosition(pos => {
+        const { latitude, longitude } = pos.coords;
+        L.marker([latitude, longitude], {
+          icon: L.divIcon({ html: `<div style="width:18px;height:18px;background:red;border-radius:50%;border:2px solid white;"></div>` }),
+          zIndexOffset: 1000
+        }).addTo(map);
+        map.setView([latitude, longitude], 15);
+      });
+    });
+
+    async function fetchTSVandPlot() {
+      const res = await fetch(tsvUrl);
+      const tsvText = await res.text();
+      const rows = tsvText.trim().split("\n").map(r => r.split("\t")).slice(1);
+
+      const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      markerData = [];
+
+      rows.forEach(row => {
+        const team = row[idx.team] || "";
+        if (!checkedTeams.some(t => team.includes(t))) return;
+
+        const coord = row[idx.coord];
+        if (!coord || !coord.includes(",")) return;
+        const [lat, lng] = coord.split(",").map(Number);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const color = team.includes("강남") ? colors.green : team.includes("강북") ? colors.blue : colors.gray;
+        const site = row[idx.siteName] || "";
+        const addr = row[idx.address] || "";
+        const contact = row[idx.contact] || "";
+        const model = row[idx.model] || "";
+        const fan = row[idx.fan] || "";
+        const expire = row[idx.expire] || "";
+        const wNum = (row[idx.wNum] || "").replace(/\D/g, "").padStart(7, "0");
+
+        const html = `
+          <b><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wNum}" target="_blank">${site} (${wNum})</a></b><br/>
+          ${addr}<br/>
+          📞 ${contact}<br/>
+          기종: ${model}<br/>
+          Fan: ${fan}<br/>
+          유효기간: ${expire}
+        `;
+
+        const icon = L.divIcon({
+          html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        });
+
+        const marker = L.marker([lat, lng], { icon }).addTo(map).bindPopup(html);
+        markers.push(marker);
+        markerData.push({ marker, team, text: html.toLowerCase(), icon });
+      });
+
+      updateMarkerHighlighting();
+    }
+
+    function updateMarkerHighlighting() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      markerData.forEach(({ marker, team, text }) => {
+        const match = text.includes(q);
+        const color = match ? (team.includes("강남") ? colors.green : team.includes("강북") ? colors.blue : colors.orange) : colors.gray75;
+        marker.setIcon(L.divIcon({
+          html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        }));
+      });
+    }
+
+    document.getElementById("searchInput").addEventListener("input", updateMarkerHighlighting);
+    document.getElementById("searchClear").addEventListener("click", () => {
+      document.getElementById("searchInput").value = "";
+      updateMarkerHighlighting();
+    });
+
+    document.querySelectorAll(".team-filter input").forEach(input =>
+      input.addEventListener("change", fetchTSVandPlot)
+    );
+
+    document.addEventListener("DOMContentLoaded", fetchTSVandPlot);
+  </script>
+</body>
+</html>
