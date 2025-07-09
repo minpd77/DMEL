@@ -402,76 +402,54 @@ const labelHtml = label
 }
 
     // ==== UTILITIES ====
-    function normalizeText(str) {
-  return (str || "")
-    .replace(/\s+/g, "")         // 띄어쓰기 제거
-    .replace(/-/g, "")           // 하이픈 제거
-    .toLowerCase();
-}
-
-function updateMarkerHighlighting() {
-  const termRaw = searchInput.value.trim();
-  const term = normalizeText(termRaw);
-
-  markerData.forEach(o => {
-    let content = o.popupHtmlOriginal;
-    const searchTarget = getPopupSearchableText(content);
-    const normalizedTarget = normalizeText(searchTarget);
-    let hit = false;
-
-    if (term) {
-      if (normalizedTarget.includes(term)) {
-        hit = true;
-        // 원본에서 <a> 태그 제거
-        const safeHtml = searchTarget.replace(/<a\b[^>]*>.*?<\/a>/gi, '');
-        const regex = new RegExp(termRaw.replace(/[-\s]/g, ""), "gi");
-
-        content = o.popupHtmlOriginal.replace(regex, match => {
-          return `<span class="highlight-text">${match}</span>`;
-        });
-      }
+    function calcDateDiff(ds){
+      if(!ds) return "";
+      let c=ds.replace(/[^\d\-]/g,'').replace(/-{2,}/g,'-');
+      if(/^\d{8}$/.test(c)) c=c.replace(/^(\d{4})(\d{2})(\d{2})$/,'$1-$2-$3');
+      const d=new Date(c), now=new Date();
+      if(isNaN(d)) return "";
+      const diff=Math.floor((d.getTime()-now.getTime())/(1000*60*60*24));
+      return diff>=0?`D-${diff}`:`D+${Math.abs(diff)}`;
     }
-
-    const newColor = term
-      ? (hit ? colors.orange : colors.gray75)
-      : o.baseColor;
-
-    o.marker.setIcon(L.divIcon({
-      html: o.createMarkerHtml(newColor),
-      iconSize: [18, 18],
-      iconAnchor: [9, 9],
-      popupAnchor: [0, -9],
-      className: ""
-    }));
-    o.marker.getPopup().setContent(content);
-  });
-}
-
-  markerData.forEach(o => {
-    let content = o.popupHtmlOriginal;
-
-    // 링크(<a>)는 검색 제외 → 텍스트 대체
-    const noLinkContent = content.replace(/<a\b[^>]*>.*?<\/a>/gi, '');
-
-    // 전체 텍스트에서 검색
-    const plainText = noLinkContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
-    const isHit = plainText.includes(term);
-
-    if (isHit) {
-      // 링크 안은 제외하고 하이라이트 처리
-      content = content.replace(/<a\b[^>]*>.*?<\/a>/gi, match => match.replace(new RegExp(term, 'gi'), '[[[HIDDEN]]]'));
-      content = content.replace(new RegExp(term, 'gi'), `<span class="highlight-text">$&</span>`);
-      content = content.replace(/\[\[\[HIDDEN\]\]\]/g, term);
+    function calcDateDiffNumber(ds){
+      if(!ds) return null;
+      let c=ds.replace(/[^\d\-]/g,'').replace(/-{2,}/g,'-');
+      if(/^\d{8}$/.test(c)) c=c.replace(/^(\d{4})(\d{2})(\d{2})$/,'$1-$2-$3');
+      const d=new Date(c), now=new Date();
+      if(isNaN(d)) return null;
+      return Math.floor((d.getTime()-now.getTime())/(1000*60*60*24));
     }
-
-    const newColor = isHit ? colors.orange : colors.gray75;
-    o.marker.setIcon(L.divIcon({
-      html: o.createMarkerHtml(newColor),
-      iconSize:[18,18], iconAnchor:[9,9], popupAnchor:[0,-9], className:""
-    }));
-    o.marker.getPopup().setContent(content);
-  });
-}
+    function isValidDate(ds){
+      const d=new Date(ds);
+      return !isNaN(d);
+    }
+    function getPopupSearchableText(html){
+      const noLinks=html.replace(/<a\b[^>]*>.*?<\/a>/gi,'');
+      return noLinks.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+    }
+    function updateMarkerHighlighting(){
+      const term=searchInput.value.trim().toLowerCase();
+      markerData.forEach(o=>{
+        let content=o.popupHtmlOriginal;
+        let hit=false;
+        if(term){
+          const txt=getPopupSearchableText(content).toLowerCase();
+          if(txt.includes(term)){
+            content=content
+              .replace(/(<a\b[^>]*>.*?<\/a>)/gi,m=>m.replace(new RegExp(term,'gi'),'@@#@@'))
+              .replace(new RegExp(term,'gi'),'<span class="highlight-text">$&</span>')
+              .replace(/@@#@@/g,term);
+            hit=true;
+          }
+        }
+        const newColor=term?(hit?colors.orange:colors.gray75):o.baseColor;
+        o.marker.setIcon(L.divIcon({
+          html:o.createMarkerHtml(newColor),
+          iconSize:[18,18],iconAnchor:[9,9],popupAnchor:[0,-9],className:""
+        }));
+        o.marker.getPopup().setContent(content);
+      });
+    }
 
     // ==== LOAD 신고 TSV ====
 let lastAlarmKeys = new Set();
