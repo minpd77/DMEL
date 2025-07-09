@@ -240,105 +240,135 @@
     document.addEventListener("keydown", e => { if(e.key==="Escape") alarmPopup.style.display="none"; });
 
     // ===== MAIN FETCH & PLOT =====
-    async function fetchTSVandPlot(){
-      markers.forEach(m => map.removeLayer(m));
-      markers=[]; markerData=[]; coordGroups={};
-      if(!fetchTSVandPlot.isIntervalSet){
-        setInterval(fetchTSVandPlot,60000);
-        fetchTSVandPlot.isIntervalSet=true;
+const markersMap = {}; // 전역에 선언 (한 번만)
+
+async function fetchTSVandPlot() {
+  const res = await fetch(tsvUrl);
+  const tsvText = await res.text();
+  const rows = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
+
+  const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
+  const filterGangnam = checkedTeams.includes("강남팀");
+  const filterGangbuk = checkedTeams.includes("강북팀");
+  const filterNeed = checkedTeams.includes("검사필요");
+  const searchTerm = searchInput.value.trim().toLowerCase();
+
+  let cntGN = 0, cntGB = 0, totalGN = 0, totalGB = 0, cntNeedNum = 0;
+  const newKeys = new Set();
+  const coordGroups = {};
+
+  rows.forEach(row => {
+    const team = row[idx.team] || "";
+    if (team.includes("해지")) return;
+
+    const coordStr = row[idx.coord];
+    if (!coordStr) return;
+    const [latS, lngS] = coordStr.split(",");
+    if (!lngS) return;
+    const lat = parseFloat(latS), lng = parseFloat(lngS);
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    const siteName = row[idx.siteName] || "";
+    const address = row[idx.address] || "";
+    const contact = row[idx.contact] || "";
+    const expire = row[idx.expire] || "";
+    const checkDate = row[idx.checkDate] || "";
+
+    const dDay = calcDateDiffNumber(expire);
+    const isNeed = dDay !== null && dDay <= 0 && dDay >= -60;
+    if (isNeed) cntNeedNum++;
+
+    if (team.includes("강남팀")) totalGN++;
+    if (team.includes("강북팀")) totalGB++;
+
+    const hasDate = !!checkDate && isValidDate(checkDate);
+    if (team.includes("강남팀") && hasDate) cntGN++;
+    if (team.includes("강북팀") && hasDate) cntGB++;
+
+    let show = false, color = "", labelText = "", zIndex = 500;
+
+    if (searchTerm) {
+      const combined = `${siteName} ${address} ${contact}`.toLowerCase();
+      if (combined.includes(searchTerm)) {
+        show = true;
+        color = colors.orange;
+        zIndex = 1000;
       }
-      const res = await fetch(tsvUrl), tsvText = await res.text();
-      const rows = tsvText.trim().split("\n").slice(1).map(r=>r.split("\t"));
-      const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i=>i.value);
-      const inspectionNeededChecked = checkedTeams.includes("검사필요");
-      let cntGN=0,cntGB=0,cntNeedNum=0,totalGN=0,totalGB=0;
-
-      rows.forEach(row=>{
-        const team=row[idx.team]||"";
-        if(team.includes("해지")) return;
-        const coordStr=row[idx.coord]; if(!coordStr) return;
-        const [latS,lngS]=coordStr.split(","); if(!lngS) return;
-        const lat=parseFloat(latS),lng=parseFloat(lngS);
-        if(isNaN(lat)||isNaN(lng)) return;
-        let color="",dDay=null;
-        if(inspectionNeededChecked){
-          dDay=calcDateDiffNumber(row[idx.expire]||"");
-          if(dDay===null||dDay>60) return;
-          color=colors.red; cntNeedNum++;
-        } else if(row[idx.checkDate]&&isValidDate(row[idx.checkDate])){
-          color=colors.gray;
-        } else if(team.includes("강남팀")){
-          color=colors.green; totalGN++;
-        } else if(team.includes("강북팀")){
-          color=colors.blue; totalGB++;
-        } else return;
-
-        const key=`${lat.toFixed(6)},${lng.toFixed(6)}`;
-        if(!coordGroups[key]) coordGroups[key]={lat,lng,color,entries:[],minDDay:null};
-        coordGroups[key].entries.push(row);
-        if(inspectionNeededChecked&&(coordGroups[key].minDDay===null||dDay<coordGroups[key].minDDay)){
-          coordGroups[key].minDDay=dDay;
+    } else if (filterNeed) {
+      show = true;
+      if (isNeed) {
+        color = colors.red;
+        labelText = `${Math.abs(dDay)}`;
+        zIndex = 1000;
+      } else {
+        color = colors.gray75;
+        zIndex = 100;
+      }
+    } else {
+      if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
+        show = true;
+        if (hasDate) {
+          color = colors.gray;
+          zIndex = 100;
+        } else {
+          color = team.includes("강남팀") ? colors.green : colors.blue;
+          zIndex = 1000;
         }
-        if(team.includes("강남팀")) cntGN++;
-        if(team.includes("강북팀")) cntGB++;
-      });
-
-      cntGangnam.textContent=` (${cntGN}/${totalGN||1})`;
-      cntGangbuk.textContent=` (${cntGB}/${totalGB||1})`;
-      cntNeed.textContent=` (${cntNeedNum})`;
-
-      Object.values(coordGroups).forEach(group=>{
-        const {lat,lng,color,entries,minDDay}=group;
-        const showCount=entries.length>1;
-        let markerLabel="";
-        if(inspectionNeededChecked&&minDDay!=null){
-          const sd=minDDay<0?0:minDDay;
-          markerLabel=`<div class="marker-label" style="background:rgba(0,0,0,0.16);font-size:15px;padding:0 4px;">${sd}</div>`;
-        } else if(showCount){
-          markerLabel=`<div class="marker-label" style="background:rgba(0,0,0,0.14);font-size:14px;padding:0 4px;">${entries.length}</div>`;
-        }
-        function createMarkerHtml(col){
-          return `<div style="position:relative;width:18px;height:18px;"><div style="background-color:${col};width:18px;height:18px;border-radius:50%;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.4);transition:background-color 0.3s ease;"></div>${markerLabel}</div>`;
-        }
-        const icon=L.divIcon({html:createMarkerHtml(color),iconSize:[18,18],iconAnchor:[9,9],popupAnchor:[0,-9],className:""});
-        const marker=L.marker([lat,lng],{icon}).addTo(map);
-
-        let popupParts=[];
-        entries.forEach(row=>{
-          const sn=row[idx.siteName]||"", addr=row[idx.address]||"", sp=row[idx.special]||"",
-                cd=row[idx.checkDate]||"", wr=row[idx.wNum]||"", ct=row[idx.contact]||"",
-                md=row[idx.model]||"", fn=row[idx.fan]||"", bt=row[idx.biTongNum]||"",
-                eq=row[idx.biTongEquip]||"", ex=row[idx.expire]||"";
-          const wp=wr.replace(/\D/g,'').padStart(7,"0");
-          const nlink=`nmap://search?query=${encodeURIComponent(addr)}`;
-          const dm=calcDateDiff(ex);
-          let fanHtml="";
-          if(fn.toLowerCase()==="on") fanHtml=`<span style="color:green;font-weight:bold;font-size:18px;line-height:1;">●</span>`;
-          else if(fn.toLowerCase()==="off") fanHtml=`<span style="color:red;font-weight:bold;font-size:18px;line-height:1;">●</span>`;
-          else fanHtml=fn?`<span>${fn}</span>`:"";
-          popupParts.push(`
-            <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank" rel="noopener noreferrer" style="color:black;text-decoration:none;">${sn} (${wp})</a></strong><br/>
-            <a href="${nlink}" target="_blank" rel="noopener noreferrer" class="addr-link" style="color:black;">${addr}</a><br/>
-            📞 <a href="tel:${ct.replace(/\D/g,'')}" class="tel-link">${ct}</a><br/>
-            특이사항: ${sp}<br/>
-            점검: ${cd}<br/>
-            기종: ${md}<br/>
-            Fan: ${fanHtml}<br/>
-            비통번호: ${bt}<br/>
-            비통장비: ${eq}<br/>
-            유효기간: ${ex} ${dm}
-            <hr style="margin:6px 0;border:0;border-top:1px solid #ddd;" />
-          `);
-        });
-        let content=`<div class="popup-scroll">${popupParts.join("")}</div>`;
-        content=content.replace(/<hr[^>]*>\s*<\/div>$/,'</div>');
-        marker.bindPopup(content);
-        markers.push(marker);
-        markerData.push({marker,popupHtmlOriginal:content,baseColor:color,entries,createMarkerHtml});
-      });
-
-      updateMarkerHighlighting();
+      }
     }
+
+    if (!show) return;
+
+    const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    newKeys.add(key);
+    if (!coordGroups[key]) coordGroups[key] = { lat, lng, entries: [], color, labelText, zIndex };
+    coordGroups[key].entries.push(row);
+  });
+
+  cntGangnam.textContent = ` (${cntGN}/${totalGN || 1})`;
+  cntGangbuk.textContent = ` (${cntGB}/${totalGB || 1})`;
+  cntNeed.textContent = ` (${cntNeedNum})`;
+
+  // 1. 새로운 좌표만 추가 또는 업데이트
+  Object.entries(coordGroups).forEach(([key, group]) => {
+    const { lat, lng, entries, color, labelText, zIndex } = group;
+    const labelHtml = labelText
+      ? `<div class="marker-label" style="font-size:12px; letter-spacing: -1px;">&nbsp;${labelText}</div>` : "";
+
+    const html = `<div style="position:relative;width:18px;height:18px;">
+                    <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
+                    ${labelHtml}
+                  </div>`;
+
+    const icon = L.divIcon({ html, iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -9], className: "" });
+
+    const existing = markersMap[key];
+    if (existing) {
+      const old = existing.__meta || {};
+      const changed = old.color !== color || old.labelText !== labelText;
+      if (changed) {
+        existing.setIcon(icon);
+        existing.setZIndexOffset(zIndex);
+        existing.__meta = { color, labelText };
+      }
+    } else {
+      const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
+      marker.bindPopup(generatePopup(entries));
+      marker.__meta = { color, labelText };
+      markersMap[key] = marker;
+    }
+  });
+
+  // 2. 더 이상 없는 좌표 제거
+  Object.keys(markersMap).forEach(key => {
+    if (!newKeys.has(key)) {
+      map.removeLayer(markersMap[key]);
+      delete markersMap[key];
+    }
+  });
+
+  updateMarkerHighlighting(); // 검색 반영
+}
 
     // ==== UTILITIES ====
     function calcDateDiff(ds){
