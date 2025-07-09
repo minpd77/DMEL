@@ -240,9 +240,13 @@
     document.addEventListener("keydown", e => { if(e.key==="Escape") alarmPopup.style.display="none"; });
 
     // ===== MAIN FETCH & PLOT =====
-const markersMap = {}; // 전역에 선언 (한 번만)
+const markersMap = {}; 
+    async function fetchTSVandPlot() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  markerData = [];
+  coordGroups = {};
 
-async function fetchTSVandPlot() {
   const res = await fetch(tsvUrl);
   const tsvText = await res.text();
   const rows = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
@@ -254,8 +258,6 @@ async function fetchTSVandPlot() {
   const searchTerm = searchInput.value.trim().toLowerCase();
 
   let cntGN = 0, cntGB = 0, totalGN = 0, totalGB = 0, cntNeedNum = 0;
-  const newKeys = new Set();
-  const coordGroups = {};
 
   rows.forEach(row => {
     const team = row[idx.team] || "";
@@ -298,7 +300,7 @@ async function fetchTSVandPlot() {
       show = true;
       if (isNeed) {
         color = colors.red;
-        labelText = `${Math.abs(dDay)}`;
+        labelText = `${Math.abs(dDay)}`;  // 부호 제거
         zIndex = 1000;
       } else {
         color = colors.gray75;
@@ -320,54 +322,66 @@ async function fetchTSVandPlot() {
     if (!show) return;
 
     const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-    newKeys.add(key);
-    if (!coordGroups[key]) coordGroups[key] = { lat, lng, entries: [], color, labelText, zIndex };
+    if (!coordGroups[key]) coordGroups[key] = { lat, lng, entries: [], colorList: [], labelList: [], zList: [] };
     coordGroups[key].entries.push(row);
+    coordGroups[key].colorList.push(color);
+    coordGroups[key].zList.push(zIndex);
+    if (labelText) coordGroups[key].labelList.push(labelText);
   });
 
   cntGangnam.textContent = ` (${cntGN}/${totalGN || 1})`;
   cntGangbuk.textContent = ` (${cntGB}/${totalGB || 1})`;
   cntNeed.textContent = ` (${cntNeedNum})`;
 
-  // 1. 새로운 좌표만 추가 또는 업데이트
-  Object.entries(coordGroups).forEach(([key, group]) => {
-    const { lat, lng, entries, color, labelText, zIndex } = group;
-    const labelHtml = labelText
-      ? `<div class="marker-label" style="font-size:12px; letter-spacing: -1px;">&nbsp;${labelText}</div>` : "";
+  Object.values(coordGroups).forEach(group => {
+    const { lat, lng, entries, colorList, labelList, zList } = group;
+    const color = colorList[0] || colors.gray;
+    const zIndex = zList[0] || 500;
+    const labelValue = labelList.length > 0 ? labelList[0] : (entries.length > 1 ? `${entries.length}` : "");
 
-    const html = `<div style="position:relative;width:18px;height:18px;">
-                    <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
-                    ${labelHtml}
-                  </div>`;
+    const labelHtml = labelValue
+      ? `<div class="marker-label" style="font-size:12px; letter-spacing: -1px;">&nbsp;${labelValue}</div>`
+      : "";
 
-    const icon = L.divIcon({ html, iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -9], className: "" });
+    const icon = L.divIcon({
+      html: `<div style="position:relative;width:18px;height:18px;">
+               <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
+               ${labelHtml}
+             </div>`,
+      iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -9], className: ""
+    });
 
-    const existing = markersMap[key];
-    if (existing) {
-      const old = existing.__meta || {};
-      const changed = old.color !== color || old.labelText !== labelText;
-      if (changed) {
-        existing.setIcon(icon);
-        existing.setZIndexOffset(zIndex);
-        existing.__meta = { color, labelText };
-      }
-    } else {
-      const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
-      marker.bindPopup(generatePopup(entries));
-      marker.__meta = { color, labelText };
-      markersMap[key] = marker;
-    }
+    const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
+
+    const popupHtml = entries.map(row => {
+      const sn = row[idx.siteName] || "", addr = row[idx.address] || "", sp = row[idx.special] || "",
+            cd = row[idx.checkDate] || "", wr = row[idx.wNum] || "", ct = row[idx.contact] || "",
+            md = row[idx.model] || "", fn = row[idx.fan] || "", bt = row[idx.biTongNum] || "",
+            eq = row[idx.biTongEquip] || "", ex = row[idx.expire] || "";
+      const wp = wr.replace(/\D/g, '').padStart(7, "0");
+      const dm = calcDateDiff(ex);
+      const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
+      return `
+        <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
+        <a href="${nlink}" target="_blank">${addr}</a><br/>
+        📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
+        특이사항: ${sp}<br/>
+        점검: ${cd}<br/>
+        기종: ${md}<br/>
+        Fan: ${fn}<br/>
+        비통번호: ${bt}<br/>
+        비통장비: ${eq}<br/>
+        유효기간: ${ex} ${dm}
+        <hr/>`;
+    }).join("");
+    const wrappedPopup = `<div class="popup-scroll">${popupHtml}</div>`.replace(/<hr\/>\s*<\/div>$/, '</div>');
+
+    marker.bindPopup(wrappedPopup);
+    markers.push(marker);
+    markerData.push({ marker, entries, popupHtmlOriginal: wrappedPopup, baseColor: color });
   });
 
-  // 2. 더 이상 없는 좌표 제거
-  Object.keys(markersMap).forEach(key => {
-    if (!newKeys.has(key)) {
-      map.removeLayer(markersMap[key]);
-      delete markersMap[key];
-    }
-  });
-
-  updateMarkerHighlighting(); // 검색 반영
+  updateMarkerHighlighting();
 }
 
     // ==== UTILITIES ====
