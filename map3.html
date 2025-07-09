@@ -9,15 +9,18 @@
     href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
   />
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; overflow-x: hidden; }
-    #map { width: 100%; height: 90vh; }
+  html, body { height: 100%; margin: 0; padding: 0; overflow-x: hidden; }
+  #map { width: 100%; height: 90vh; }
 
-    #speedBox {
-      position: fixed; top: 12px; left: 18px; z-index: 9999;
-      background: rgba(255,255,255,0.95); color: #333; border-radius: 7px;
-      font-size: 15px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      padding: 4px 14px; pointer-events: none;
-    }
+  /* 👇👇👇 이 줄을 추가하세요 */
+  .highlight-text { background-color: yellow; color: red; font-weight: bold; }
+
+  #speedBox {
+    position: fixed; top: 12px; left: 18px; z-index: 9999;
+    background: rgba(255,255,255,0.95); color: #333; border-radius: 7px;
+    font-size: 15px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    padding: 4px 14px; pointer-events: none;
+  }
 
     .custom-popup { font-size: 14px; line-height: 1.4; white-space: normal; color: black !important; }
     .popup-scroll { max-height: 280px; overflow-y: auto; }
@@ -246,6 +249,7 @@ const cntCheck = document.getElementById("cntCheck");
 const markersMap = {}; // key = 좌표 문자열, 값 = 마커
 
 async function fetchTSVandPlot() {
+  markerData = []; // 이전 데이터 초기화
   const res = await fetch(tsvUrl);
   const tsvText = await res.text();
   const rows = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
@@ -300,13 +304,11 @@ async function fetchTSVandPlot() {
       return combined.includes(searchTerm);
     };
 
-    // ✅ 검색 우선
     if (searchTerm && matchesSearch()) {
       show = true;
       color = colors.orange;
       labelText = "";
       zIndex = 1000;
-
     } else if (filterNeed) {
       show = true;
       if (isNeed) {
@@ -317,7 +319,6 @@ async function fetchTSVandPlot() {
         color = colors.gray75;
         zIndex = 100;
       }
-
     } else if (filterCheck) {
       show = true;
       if (isCheckValid) {
@@ -328,7 +329,6 @@ async function fetchTSVandPlot() {
         color = colors.gray75;
         zIndex = 100;
       }
-
     } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
       show = true;
       if (hasDate && row[idx.checkDate] !== expire) {
@@ -383,31 +383,49 @@ async function fetchTSVandPlot() {
     } else {
       const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
       const popupHtml = entries.map(row => {
-        const sn = row[idx.siteName] || "", addr = row[idx.address] || "", sp = row[idx.special] || "",
-              cd = row[idx.checkDate] || "", wr = row[idx.wNum] || "", ct = row[idx.contact] || "",
-              md = row[idx.model] || "", fn = row[idx.fan] || "", bt = row[idx.biTongNum] || "",
-              eq = row[idx.biTongEquip] || "", ex = row[idx.expire] || "";
-        const wp = wr.replace(/\D/g, '').padStart(7, "0");
-        const dm = calcDateDiff(ex);
-        const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
-        return `
-          <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
-          <a href="${nlink}" target="_blank">${addr}</a><br/>
-          📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
-          특이사항: ${sp}<br/>
-          점검: ${cd}<br/>
-          기종: ${md}<br/>
-          Fan: ${fn}<br/>
-          비통번호: ${bt}<br/>
-          비통장비: ${eq}<br/>
-          유효기간: ${ex} ${dm}
-          <hr/>`;
-      }).join("");
+  const sn = row[idx.siteName] || "", addr = row[idx.address] || "", sp = row[idx.special] || "",
+        cd = row[idx.checkDate] || "", wr = row[idx.wNum] || "", ct = row[idx.contact] || "",
+        md = row[idx.model] || "", fn = row[idx.fan] || "", bt = row[idx.biTongNum] || "",
+        eq = row[idx.biTongEquip] || "", ex = row[idx.expire] || "";
+  const wp = wr.replace(/\D/g, '').padStart(7, "0");
+  const dm = calcDateDiff(ex);
+  const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
+  return `
+    <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
+    <a href="${nlink}" target="_blank">${addr}</a><br/>
+📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
+특이사항: ${sp}<br/>
+점검: ${cd}<br/>
+기종: ${md}<br/>
+Fan: ${fn}<br/>
+비통번호: ${bt}<br/>
+비통장비: ${eq}<br/>
+유효기간: ${ex} ${dm}<br/>
+<strong style="color:red;">검사일: ${cd}</strong>
+    <hr/>`;
+}).join("");
 
       const wrappedPopup = `<div class="popup-scroll">${popupHtml}</div>`.replace(/<hr\/>\s*<\/div>$/, '</div>');
       marker.bindPopup(wrappedPopup);
       marker.__meta = { color, labelText };
       markersMap[key] = marker;
+
+      // ✅ markerData에 등록하여 검색 시 반응하게 하기
+      markerData.push({
+        marker,
+        popupHtmlOriginal: wrappedPopup,
+        baseColor: color,
+        labelText,
+        createMarkerHtml: (c) => {
+          const labelHtml = label
+            ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
+            : "";
+          return `<div style="position:relative;width:18px;height:18px;">
+            <div style="background-color:${c};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
+            ${labelHtml}
+          </div>`;
+        }
+      });
     }
   });
 
@@ -418,6 +436,7 @@ async function fetchTSVandPlot() {
     }
   });
 
+  // ✅ 검색어에 따른 마커 반영
   updateMarkerHighlighting();
 }
     // ==== UTILITIES ====
@@ -446,29 +465,56 @@ async function fetchTSVandPlot() {
       const noLinks=html.replace(/<a\b[^>]*>.*?<\/a>/gi,'');
       return noLinks.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
     }
-    function updateMarkerHighlighting(){
-      const term=searchInput.value.trim().toLowerCase();
-      markerData.forEach(o=>{
-        let content=o.popupHtmlOriginal;
-        let hit=false;
-        if(term){
-          const txt=getPopupSearchableText(content).toLowerCase();
-          if(txt.includes(term)){
-            content=content
-              .replace(/(<a\b[^>]*>.*?<\/a>)/gi,m=>m.replace(new RegExp(term,'gi'),'@@#@@'))
-              .replace(new RegExp(term,'gi'),'<span class="highlight-text">$&</span>')
-              .replace(/@@#@@/g,term);
-            hit=true;
-          }
-        }
-        const newColor=term?(hit?colors.orange:colors.gray75):o.baseColor;
-        o.marker.setIcon(L.divIcon({
-          html:o.createMarkerHtml(newColor),
-          iconSize:[18,18],iconAnchor:[9,9],popupAnchor:[0,-9],className:""
-        }));
-        o.marker.getPopup().setContent(content);
+    function updateMarkerHighlighting() {
+  const termRaw = searchInput.value.trim().toLowerCase();
+  const term = termRaw.replace(/[\s\-]/g, "");
+
+  markerData.forEach(o => {
+    let html = o.popupHtmlOriginal;
+    let hit = false;
+
+    // 1️⃣ 검색 대상 텍스트만 추출 (링크/태그 제거)
+    const searchTarget = o.popupHtmlOriginal
+      .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1') // 링크 텍스트만 추출
+      .replace(/<[^>]+>/g, '')                 // HTML 태그 제거
+      .replace(/\s+/g, ' ')                    // 공백 정리
+      .toLowerCase()
+      .replace(/[\s\-]/g, '');                 // 공백/하이픈 제거
+
+    if (term && searchTarget.includes(term)) {
+      hit = true;
+
+      // 2️⃣ 링크 백업
+      const links = [];
+      html = html.replace(/<a\b[^>]*>.*?<\/a>/gi, m => {
+        links.push(m);
+        return `@@LINK${links.length - 1}@@`;
       });
+
+      // 3️⃣ 하이라이트 적용 (링크 제외된 상태에서)
+      const safeTerm = termRaw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(safeTerm, 'gi');
+      html = html.replace(regex, '<span class="highlight-text">$&</span>');
+
+      // 4️⃣ 링크 복원
+      html = html.replace(/@@LINK(\d+)@@/g, (_, i) => links[parseInt(i)]);
     }
+
+    const newColor = term ? (hit ? colors.orange : colors.gray75) : o.baseColor;
+    const zIndex = term ? (hit ? 1000 : 100) : (newColor === colors.orange ? 1000 : 100);
+
+    o.marker.setIcon(L.divIcon({
+      html: o.createMarkerHtml(newColor),
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+      popupAnchor: [0, -9],
+      className: ""
+    }));
+    o.marker.setZIndexOffset(zIndex);
+    o.marker.getPopup().setContent(html);
+  });
+}
+
 
     // ==== LOAD 신고 TSV ====
 let lastAlarmKeys = new Set();
