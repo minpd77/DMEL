@@ -126,6 +126,7 @@
     <label><input type="checkbox" value="강남팀" checked> 강남팀 <span id="cntGangnam"></span></label>
     <label><input type="checkbox" value="강북팀" checked> 강북팀 <span id="cntGangbuk"></span></label>
     <label><input type="checkbox" value="검사필요"> 검사필요 <span id="cntNeed"></span></label>
+<label><input type="checkbox" value="검사정기정밀"> 검사(정기정밀) <span id="cntCheck"></span></label>
   </div>
 
   <div id="alarmPopup">
@@ -224,6 +225,8 @@
     const cntGangnam = document.getElementById("cntGangnam"),
           cntGangbuk = document.getElementById("cntGangbuk"),
           cntNeed = document.getElementById("cntNeed");
+const cntCheck = document.getElementById("cntCheck");
+
 
     // ==== 신고 POPUP TOGGLE ====
     const alarmBtnEl = document.getElementById("alarmBtn"),
@@ -251,9 +254,10 @@ async function fetchTSVandPlot() {
   const filterGangnam = checkedTeams.includes("강남팀");
   const filterGangbuk = checkedTeams.includes("강북팀");
   const filterNeed = checkedTeams.includes("검사필요");
+  const filterCheck = checkedTeams.includes("검사정기정밀");
   const searchTerm = searchInput.value.trim().toLowerCase();
 
-  let cntGN = 0, cntGB = 0, totalGN = 0, totalGB = 0, cntNeedNum = 0;
+  let cntGN = 0, cntGB = 0, totalGN = 0, totalGB = 0, cntNeedNum = 0, cntCheckNum = 0;
   const coordGroups = {};
   const newKeys = new Set();
 
@@ -278,6 +282,10 @@ async function fetchTSVandPlot() {
     const isNeed = dDay !== null && dDay <= 0 && dDay >= -60;
     if (isNeed) cntNeedNum++;
 
+    const checkD = calcDateDiffNumber(checkDate);
+    const isCheckValid = checkD !== null && checkD >= -30 && checkD <= 0;
+    if (isCheckValid) cntCheckNum++;
+
     if (team.includes("강남팀")) totalGN++;
     if (team.includes("강북팀")) totalGB++;
 
@@ -298,6 +306,7 @@ async function fetchTSVandPlot() {
       color = colors.orange;
       labelText = "";
       zIndex = 1000;
+
     } else if (filterNeed) {
       show = true;
       if (isNeed) {
@@ -308,6 +317,19 @@ async function fetchTSVandPlot() {
         color = colors.gray75;
         zIndex = 100;
       }
+
+    } else if (filterCheck) {
+      show = true;
+      if (isCheckValid) {
+        color = colors.red;
+        labelText = `${Math.abs(checkD)}`;
+        zIndex = 1000;
+      } else {
+        color = colors.gray75;
+        labelText = "";
+        zIndex = 100;
+      }
+
     } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
       show = true;
       if (hasDate && checkDate !== expire) {
@@ -330,16 +352,16 @@ async function fetchTSVandPlot() {
   cntGangnam.textContent = ` (${cntGN}/${totalGN || 1})`;
   cntGangbuk.textContent = ` (${cntGB}/${totalGB || 1})`;
   cntNeed.textContent = ` (${cntNeedNum})`;
+  cntCheck.textContent = ` (${cntCheckNum})`;
 
   Object.entries(coordGroups).forEach(([key, group]) => {
     const { lat, lng, entries, color, labelText, zIndex } = group;
     let label = labelText;
-if (!label && entries.length > 1) {
-  label = `${entries.length}`;
-}
-const labelHtml = label
-  ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
-  : "";
+    if (!label && entries.length > 1) label = `${entries.length}`;
+
+    const labelHtml = label
+      ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
+      : "";
 
     const html = `<div style="position:relative;width:18px;height:18px;">
       <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
@@ -390,7 +412,6 @@ const labelHtml = label
     }
   });
 
-  // 🔻 기존에 있었지만 현재 없어지면 지도에서 제거
   Object.keys(markersMap).forEach(key => {
     if (!newKeys.has(key)) {
       map.removeLayer(markersMap[key]);
@@ -400,7 +421,6 @@ const labelHtml = label
 
   updateMarkerHighlighting();
 }
-
     // ==== UTILITIES ====
     function calcDateDiff(ds){
       if(!ds) return "";
