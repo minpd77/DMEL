@@ -276,20 +276,20 @@ async function fetchTSVandPlot() {
     const address = row[idx.address] || "";
     const contact = row[idx.contact] || "";
     const expire = row[idx.expire] || "";
-    const checkDate = row[idx.checkDate] || "";
+    const checkDate = row[8] || ""; // I열
 
     const dDay = calcDateDiffNumber(expire);
     const isNeed = dDay !== null && dDay <= 0 && dDay >= -60;
     if (isNeed) cntNeedNum++;
 
     const checkD = calcDateDiffNumber(checkDate);
-    const isCheckValid = checkD !== null && checkD >= -30 && checkD <= 0;
+    const isCheckValid = checkD !== null && checkD >= 0;
     if (isCheckValid) cntCheckNum++;
 
     if (team.includes("강남팀")) totalGN++;
     if (team.includes("강북팀")) totalGB++;
 
-    const hasDate = !!checkDate && isValidDate(checkDate);
+    const hasDate = !!row[idx.checkDate] && isValidDate(row[idx.checkDate]);
     if (team.includes("강남팀") && hasDate) cntGN++;
     if (team.includes("강북팀") && hasDate) cntGB++;
 
@@ -300,7 +300,7 @@ async function fetchTSVandPlot() {
       return combined.includes(searchTerm);
     };
 
-    // ✅ 검색이 최우선
+    // ✅ 검색 우선
     if (searchTerm && matchesSearch()) {
       show = true;
       color = colors.orange;
@@ -322,17 +322,16 @@ async function fetchTSVandPlot() {
       show = true;
       if (isCheckValid) {
         color = colors.red;
-        labelText = `${Math.abs(checkD)}`;
+        labelText = `${checkD}`;
         zIndex = 1000;
       } else {
         color = colors.gray75;
-        labelText = "";
         zIndex = 100;
       }
 
     } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
       show = true;
-      if (hasDate && checkDate !== expire) {
+      if (hasDate && row[idx.checkDate] !== expire) {
         color = colors.gray;
         zIndex = 100;
       } else {
