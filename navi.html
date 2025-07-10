@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>테슬라 전용 내비 포털</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 30px;
+      background-color: #f2f2f2;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      display: block;
+      width: 80%;
+      max-width: 300px;
+      margin: 10px auto;
+      padding: 15px;
+      font-size: 18px;
+      background-color: #007aff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚗 테슬라 전용 내비게이션</h1>
+
+  <div id="buttons">
+    <button class="btn" onclick="navigateTo('회사', 37.5665, 126.9780)">회사로 가기</button>
+    <button class="btn" onclick="navigateTo('집', 37.4918, 127.0124)">집으로 가기</button>
+    <button class="btn" onclick="navigateTo('병원', 37.5765, 126.9850)">병원으로 가기</button>
+  </div>
+
+  <div id="status">📍 현재 위치 확인 중...</div>
+
+  <script>
+    let currentLat = null;
+    let currentLng = null;
+
+    function navigateTo(destinationName, destLat, destLng) {
+      if (!currentLat || !currentLng) {
+        alert("현재 위치를 불러오지 못했어요.");
+        return;
+      }
+
+      const url = `https://map.kakao.com/?sName=현재위치&sx=${currentLng}&sy=${currentLat}&eName=${destinationName}&ex=${destLng}&ey=${destLat}`;
+      window.open(url, '_blank');
+    }
+
+    // 위치 정보 가져오기
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          currentLat = pos.coords.latitude;
+          currentLng = pos.coords.longitude;
+          document.getElementById("status").innerText =
+            `📍 현재 위치 확인됨 (위도 ${currentLat.toFixed(4)}, 경도 ${currentLng.toFixed(4)})`;
+        },
+        err => {
+          document.getElementById("status").innerText = "❌ 위치 권한이 거부되었습니다.";
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      document.getElementById("status").innerText = "❌ 위치 정보 사용 불가";
+    }
+  </script>
+</body>
+</html>
