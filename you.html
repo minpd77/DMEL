@@ -3,64 +3,110 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>YouTube 모바일 검색</title>
+  <title>유튜브 썸네일 카드</title>
   <style>
     body {
       font-family: sans-serif;
-      background-color: #f8f8f8;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
+      background: #f9f9f9;
+      text-align: center;
+      padding: 30px;
     }
 
-    h1 {
-      font-size: 24px;
-      margin-bottom: 20px;
+    .card {
+      display: inline-block;
+      width: 320px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      background: #fff;
+      text-align: left;
+      overflow: hidden;
+      transition: transform 0.2s;
     }
 
-    input[type="text"] {
-      width: 300px;
-      padding: 10px;
+    .card:hover {
+      transform: scale(1.03);
+    }
+
+    .thumb {
+      width: 100%;
+      display: block;
+    }
+
+    .content {
+      padding: 12px;
+    }
+
+    .title {
       font-size: 16px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      outline: none;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #222;
     }
 
-    button {
-      margin-top: 12px;
-      padding: 10px 20px;
+    .desc {
+      font-size: 14px;
+      color: #555;
+    }
+
+    .loading {
       font-size: 16px;
-      border: none;
-      background-color: #ff0000;
-      color: white;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #cc0000;
+      color: #666;
     }
   </style>
 </head>
 <body>
-  <h1>유튜브 모바일 검색</h1>
-  <input type="text" id="searchInput" placeholder="검색어를 입력하세요" />
-  <button onclick="searchYouTube()">검색</button>
+  <h1>Google 시트 연동 유튜브 카드</h1>
+  <div id="videoCard" class="loading">⏳ 로딩 중...</div>
 
   <script>
-    function searchYouTube() {
-      const query = document.getElementById('searchInput').value.trim();
-      if (query) {
-        const url = `https://m.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-        window.open(url, '_blank');
-      } else {
-        alert("검색어를 입력하세요.");
-      }
-    }
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiUViDJ7svMp5PAHmQvG1EBxkRJW-eSLtMx3Wj9C_78IhPcD-Cxb3faZLkMl8zZ57zfLsjrU8QBw_U/pub?gid=0&single=true&output=tsv";
+
+    fetch(sheetUrl)
+      .then(res => res.text())
+      .then(txt => {
+        const rows = txt.trim().split("\n");
+        const a2 = rows[1]?.split("\t")[0]?.trim(); // A2 셀
+        const match = a2.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+
+        if (match && match[1]) {
+          const videoId = match[1];
+          const thumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+          const url = `https://www.youtube.com/watch?v=${videoId}`;
+
+          // YouTube oEmbed API로 제목 불러오기
+          fetch(`https://www.youtube.com/oembed?url=${url}&format=json`)
+            .then(r => r.json())
+            .then(data => {
+              document.getElementById("videoCard").innerHTML = `
+                <a href="${url}" target="_blank" class="card">
+                  <img class="thumb" src="${thumb}" alt="썸네일" />
+                  <div class="content">
+                    <div class="title">${data.title}</div>
+                    <div class="desc">${data.author_name}</div>
+                  </div>
+                </a>
+              `;
+            })
+            .catch(() => {
+              document.getElementById("videoCard").innerHTML = `
+                <a href="${url}" target="_blank" class="card">
+                  <img class="thumb" src="${thumb}" alt="썸네일" />
+                  <div class="content">
+                    <div class="title">유튜브 영상</div>
+                    <div class="desc">제목 정보를 불러오지 못했어요</div>
+                  </div>
+                </a>
+              `;
+            });
+
+        } else {
+          document.getElementById("videoCard").innerText = "⚠️ 유효한 유튜브 링크가 없습니다.";
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("videoCard").innerText = "❌ 데이터를 불러오는 데 실패했습니다.";
+      });
   </script>
 </body>
 </html>
