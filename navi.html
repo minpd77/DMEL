@@ -1,84 +1,114 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>테슬라 전용 내비 포털</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>실시간 길 따라가기 지도</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 30px;
-      background-color: #f2f2f2;
-    }
-
-    h1 {
-      font-size: 24px;
-      margin-bottom: 20px;
-    }
-
-    .btn {
-      display: block;
-      width: 80%;
-      max-width: 300px;
-      margin: 10px auto;
-      padding: 15px;
-      font-size: 18px;
-      background-color: #007aff;
-      color: white;
-      border: none;
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100vh; width: 100vw; }
+    .dest-buttons {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px;
       border-radius: 10px;
-      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
-
-    #status {
-      margin-top: 20px;
-      font-size: 16px;
-      color: #333;
+    .dest-buttons button {
+      margin: 0 5px;
+      padding: 8px 12px;
+      font-size: 14px;
+      border: none;
+      background: #007aff;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>🚗 테슬라 전용 내비게이션</h1>
-
-  <div id="buttons">
-    <button class="btn" onclick="navigateTo('회사', 37.5665, 126.9780)">회사로 가기</button>
-    <button class="btn" onclick="navigateTo('집', 37.4918, 127.0124)">집으로 가기</button>
-    <button class="btn" onclick="navigateTo('병원', 37.5765, 126.9850)">병원으로 가기</button>
+  <div class="dest-buttons">
+    <button onclick="setDestination('회사', 37.5665, 126.9780)">회사</button>
+    <button onclick="setDestination('병원', 37.5765, 126.9850)">병원</button>
+    <button onclick="setDestination('집', 37.4918, 127.0124)">집</button>
   </div>
 
-  <div id="status">📍 현재 위치 확인 중...</div>
+  <div id="map"></div>
 
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <script>
-    let currentLat = null;
-    let currentLng = null;
+    let map = L.map('map').setView([37.5665, 126.9780], 14);
+    let userMarker = null;
+    let destMarker = null;
+    let pathLine = null;
 
-    function navigateTo(destinationName, destLat, destLng) {
-      if (!currentLat || !currentLng) {
-        alert("현재 위치를 불러오지 못했어요.");
-        return;
+    // 지도 타일
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    // 내 위치 추적 시작
+    function updateUserLocation(position) {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      if (userMarker) {
+        userMarker.setLatLng([lat, lng]);
+      } else {
+        userMarker = L.marker([lat, lng], { color: 'blue' }).addTo(map);
+        userMarker.bindPopup("📍 현재 위치").openPopup();
       }
 
-      const url = `https://map.kakao.com/?sName=현재위치&sx=${currentLng}&sy=${currentLat}&eName=${destinationName}&ex=${destLng}&ey=${destLat}`;
-      window.open(url, '_blank');
+      if (!destMarker) map.setView([lat, lng], 15);
+
+      // 선 다시 그리기
+      if (destMarker) drawRoute(lat, lng);
     }
 
-    // 위치 정보 가져오기
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          currentLat = pos.coords.latitude;
-          currentLng = pos.coords.longitude;
-          document.getElementById("status").innerText =
-            `📍 현재 위치 확인됨 (위도 ${currentLat.toFixed(4)}, 경도 ${currentLng.toFixed(4)})`;
-        },
-        err => {
-          document.getElementById("status").innerText = "❌ 위치 권한이 거부되었습니다.";
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      document.getElementById("status").innerText = "❌ 위치 정보 사용 불가";
+    function errorLocation(err) {
+      alert("위치 정보를 가져오지 못했습니다.");
+      console.error(err);
+    }
+
+    navigator.geolocation.watchPosition(updateUserLocation, errorLocation, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 5000
+    });
+
+    // 목적지 설정 함수
+    function setDestination(name, lat, lng) {
+      if (destMarker) {
+        map.removeLayer(destMarker);
+        destMarker = null;
+      }
+      destMarker = L.marker([lat, lng], { color: 'red' }).addTo(map);
+      destMarker.bindPopup(`📍 ${name}`).openPopup();
+
+      if (userMarker) {
+        const userPos = userMarker.getLatLng();
+        drawRoute(userPos.lat, userPos.lng);
+      }
+
+      map.fitBounds([userMarker.getLatLng(), [lat, lng]], { padding: [50, 50] });
+    }
+
+    // 경로선 그리기
+    function drawRoute(fromLat, fromLng) {
+      if (!destMarker) return;
+      const to = destMarker.getLatLng();
+
+      if (pathLine) map.removeLayer(pathLine);
+      pathLine = L.polyline([[fromLat, fromLng], [to.lat, to.lng]], {
+        color: 'blue',
+        weight: 4,
+        opacity: 0.8
+      }).addTo(map);
     }
   </script>
 </body>
