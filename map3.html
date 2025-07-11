@@ -303,40 +303,45 @@ async function fetchTSVandPlot() {
       const combined = `${siteName} ${address} ${contact}`.toLowerCase();
       return combined.includes(searchTerm);
     };
+    const isSearchMatch = searchTerm && matchesSearch();
 
-    if (searchTerm && matchesSearch()) {
+    if (isSearchMatch) {
       show = true;
       color = colors.orange;
       labelText = "";
       zIndex = 1000;
-    } else if (filterNeed) {
-      show = true;
-      if (isNeed) {
-        color = colors.red;
-        labelText = `${Math.abs(dDay)}`;
-        zIndex = 1000;
-      } else {
-        color = colors.gray75;
-        zIndex = 100;
-      }
-    } else if (filterCheck) {
-      show = true;
-      if (isCheckValid) {
-        color = colors.red;
-        labelText = `${checkD}`;
-        zIndex = 1000;
-      } else {
-        color = colors.gray75;
-        zIndex = 100;
-      }
-    } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
-      show = true;
-      if (hasDate && row[idx.checkDate] !== expire) {
-        color = colors.gray;
-        zIndex = 100;
-      } else {
-        color = team.includes("강남팀") ? colors.green : colors.blue;
-        zIndex = 1000;
+    }
+
+    if (!isSearchMatch) {
+      if (filterNeed) {
+        show = true;
+        if (isNeed) {
+          color = colors.red;
+          labelText = `${Math.abs(dDay)}`;
+          zIndex = 1000;
+        } else {
+          color = colors.gray75;
+          zIndex = 100;
+        }
+      } else if (filterCheck) {
+        show = true;
+        if (isCheckValid) {
+          color = colors.red;
+          labelText = `${checkD}`;
+          zIndex = 1000;
+        } else {
+          color = colors.gray75;
+          zIndex = 100;
+        }
+      } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
+        show = true;
+        if (hasDate && row[idx.checkDate] !== expire) {
+          color = colors.gray;
+          zIndex = 100;
+        } else {
+          color = team.includes("강남팀") ? colors.green : colors.blue;
+          zIndex = 1000;
+        }
       }
     }
 
@@ -405,18 +410,21 @@ Fan: ${fn}<br/>
         const wrappedPopup = `<div class="popup-scroll">${popupHtml}</div>`.replace(/<hr\/>\s*<\/div>$/, '</div>');
         existing.setPopupContent(wrappedPopup);
 
-        let blinkCount = 0;
-        const el = existing.getElement();
-        if (el) {
-          const blink = setInterval(() => {
-            if (!el) return clearInterval(blink);
-            el.style.opacity = el.style.opacity === "0.2" ? "1" : "0.2";
-            blinkCount++;
-            if (blinkCount >= 10) {
-              clearInterval(blink);
-              el.style.opacity = "1";
-            }
-          }, 200);
+        const isFilterActive = searchTerm || filterNeed || filterCheck || filterGangnam || filterGangbuk;
+        if (!isFilterActive) {
+          let blinkCount = 0;
+          const el = existing.getElement();
+          if (el) {
+            const blink = setInterval(() => {
+              if (!el) return clearInterval(blink);
+              el.style.opacity = el.style.opacity === "0.2" ? "1" : "0.2";
+              blinkCount++;
+              if (blinkCount >= 10) {
+                clearInterval(blink);
+                el.style.opacity = "1";
+              }
+            }, 200);
+          }
         }
       }
     } else {
@@ -509,35 +517,40 @@ Fan: ${fn}<br/>
     let html = o.popupHtmlOriginal;
     let hit = false;
 
-    // 1️⃣ 검색 대상 텍스트만 추출 (링크/태그 제거)
+    // 🔍 검색 대상 텍스트 생성
     const searchTarget = o.popupHtmlOriginal
-      .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1') // 링크 텍스트만 추출
-      .replace(/<[^>]+>/g, '')                 // HTML 태그 제거
-      .replace(/\s+/g, ' ')                    // 공백 정리
+      .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1') // 링크 제거
+      .replace(/<[^>]+>/g, '') // 태그 제거
+      .replace(/\s+/g, ' ')
       .toLowerCase()
-      .replace(/[\s\-]/g, '');                 // 공백/하이픈 제거
+      .replace(/[\s\-]/g, '');
 
     if (term && searchTarget.includes(term)) {
       hit = true;
 
-      // 2️⃣ 링크 백업
+      // 링크 백업
       const links = [];
       html = html.replace(/<a\b[^>]*>.*?<\/a>/gi, m => {
         links.push(m);
         return `@@LINK${links.length - 1}@@`;
       });
 
-      // 3️⃣ 하이라이트 적용 (링크 제외된 상태에서)
+      // 하이라이트 적용
       const safeTerm = termRaw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const regex = new RegExp(safeTerm, 'gi');
       html = html.replace(regex, '<span class="highlight-text">$&</span>');
 
-      // 4️⃣ 링크 복원
+      // 링크 복원
       html = html.replace(/@@LINK(\d+)@@/g, (_, i) => links[parseInt(i)]);
     }
 
-    const newColor = term ? (hit ? colors.orange : colors.gray75) : o.baseColor;
-    const zIndex = term ? (hit ? 1000 : 100) : (newColor === colors.orange ? 1000 : 100);
+    // ✅ 색상 결정 로직
+    let newColor = o.baseColor;
+    if (term) {
+      newColor = hit ? colors.orange : o.baseColor; // ❗ 검색 불일치는 기존 색 유지
+    }
+
+    const zIndex = hit ? 1000 : 100;
 
     o.marker.setIcon(L.divIcon({
       html: o.createMarkerHtml(newColor),
@@ -561,22 +574,29 @@ async function loadAlarmTsv() {
 
   const res = await fetch(alarmTsv);
   const txt = await res.text();
-  const rows = txt.trim().split("\n").slice(1).map(r => r.split("\t"));
-  rows.sort((a, b) => {
-    const da = a[0]?.trim(), db = b[0]?.trim();
-    if (!da && !db) return 0;
-    if (!da) return 1;
-    if (!db) return -1;
-    return db.localeCompare(da);
-  });
+  const rows = txt
+  .trim()
+  .split("\n")
+  .slice(1)
+  .map(r => r.split("\t"))
+  .filter(r => r[0]?.trim()) // 👉 A열이 없는 행 제외
+
+rows.sort((a, b) => {
+  const da = new Date(a[0].trim().replace(/\./g, "-").replace(" ", "T"));
+  const db = new Date(b[0].trim().replace(/\./g, "-").replace(" ", "T"));
+  return db - da; // 최신순
+});
 
   const isMobile = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
   const list = document.querySelector(".alarm-list");
 
   // 🚨 제목이 없다면 처음에 넣기
   if (!list.querySelector("h3")) {
-    list.innerHTML = `<h3>🚨 신고 접수내역</h3>`;
-  }
+  const title = document.createElement("h3");
+  title.textContent = "🚨 신고 접수내역";
+  list.insertAdjacentElement("afterbegin", title);
+}
+const titleEl = list.querySelector("h3");
 
   const currentItems = new Set();
   const newItems = [];
@@ -616,7 +636,7 @@ async function loadAlarmTsv() {
     if (!lastAlarmKeys.has(key) && !isFirstAlarmLoad) {
       newItems.push({ key, html: block });
     } else if (isFirstAlarmLoad) {
-      list.insertAdjacentHTML("beforeend", block);
+      titleEl.insertAdjacentHTML("afterend", block);
     }
   });
 
