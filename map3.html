@@ -264,6 +264,9 @@ async function fetchTSVandPlot() {
   let cntGN = 0, cntGB = 0, totalGN = 0, totalGB = 0, cntNeedNum = 0, cntCheckNum = 0;
   const coordGroups = {};
   const newKeys = new Set();
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
 
   rows.forEach(row => {
     const team = row[idx.team] || "";
@@ -294,6 +297,13 @@ async function fetchTSVandPlot() {
     if (team.includes("강북팀")) totalGB++;
 
     const hasDate = !!row[idx.checkDate] && isValidDate(row[idx.checkDate]);
+
+    let isSameMonth = false;
+    if (hasDate) {
+      const check = new Date(row[idx.checkDate]);
+      isSameMonth = check.getFullYear() === thisYear && check.getMonth() === thisMonth;
+    }
+
     if (team.includes("강남팀") && hasDate) cntGN++;
     if (team.includes("강북팀") && hasDate) cntGB++;
 
@@ -335,7 +345,7 @@ async function fetchTSVandPlot() {
         }
       } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
         show = true;
-        if (hasDate && row[idx.checkDate] !== expire) {
+        if (hasDate && isSameMonth && row[idx.checkDate] !== expire) {
           color = colors.gray;
           zIndex = 100;
         } else {
