@@ -218,9 +218,19 @@
 
     // ==== SEARCH ====
     const searchInput = document.getElementById("searchInput"),
-          searchClear = document.getElementById("searchClear");
-    searchInput.addEventListener("input", updateMarkerHighlighting);
-    searchClear.addEventListener("click", () => { searchInput.value=""; updateMarkerHighlighting(); });
+      searchClear = document.getElementById("searchClear");
+
+searchInput.addEventListener("input", () => {
+  updateMarkerHighlighting();
+  if (searchInput.value.trim() === "") {
+    updateMarkerHighlighting(); // 검색어 완전 삭제 시 강제 리셋
+  }
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  updateMarkerHighlighting();
+});
 
     // ==== FILTER ====
     const teamFilterInputs = document.querySelectorAll(".team-filter input");
@@ -561,15 +571,26 @@ Fan: ${fn}<br/>
     }
 
     const zIndex = hit ? 1000 : 100;
+    const currentIconHtml = o.createMarkerHtml(newColor);
 
-    o.marker.setIcon(L.divIcon({
-      html: o.createMarkerHtml(newColor),
-      iconSize: [18, 18],
-      iconAnchor: [9, 9],
-      popupAnchor: [0, -9],
-      className: ""
-    }));
-    o.marker.setZIndexOffset(zIndex);
+    const oldMeta = o.marker.__meta || {};
+    const needsUpdate =
+      oldMeta.html !== currentIconHtml ||
+      o.marker.getZIndexOffset() !== zIndex;
+
+    if (needsUpdate) {
+      o.marker.setIcon(L.divIcon({
+        html: currentIconHtml,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+        popupAnchor: [0, -9],
+        className: ""
+      }));
+      o.marker.setZIndexOffset(zIndex);
+      o.marker.__meta = { html: currentIconHtml };
+    }
+
+    // 팝업 내용 갱신은 항상 진행 (검색 하이라이트 때문에)
     o.marker.getPopup().setContent(html);
   });
 }
