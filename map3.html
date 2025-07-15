@@ -325,45 +325,41 @@ async function fetchTSVandPlot() {
     };
     const isSearchMatch = searchTerm && matchesSearch();
 
-    if (isSearchMatch) {
-      show = true;
-      color = colors.orange;
-      labelText = "";
-      zIndex = 1000;
-    }
-
-    if (!isSearchMatch) {
-      if (filterNeed) {
-        show = true;
-        if (isNeed) {
-          color = colors.red;
-          labelText = `${Math.abs(dDay)}`;
-          zIndex = 1000;
-        } else {
-          color = colors.gray75;
-          zIndex = 100;
-        }
-      } else if (filterCheck) {
-        show = true;
-        if (isCheckValid) {
-          color = colors.red;
-          labelText = `${checkD}`;
-          zIndex = 1000;
-        } else {
-          color = colors.gray75;
-          zIndex = 100;
-        }
-      } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
-        show = true;
-        if (hasDate && isSameMonth && row[idx.checkDate] !== expire) {
-          color = colors.gray;
-          zIndex = 100;
-        } else {
-          color = team.includes("강남팀") ? colors.green : colors.blue;
-          zIndex = 1000;
-        }
-      }
-    }
+    if (searchTerm && matchesSearch()) {
+  show = true;
+  color = colors.orange;
+  labelText = "";
+  zIndex = 1000;
+} else if (filterNeed) {
+  show = true;
+  if (isNeed) {
+    color = colors.red;
+    labelText = `${Math.abs(dDay)}`;
+    zIndex = 1000;
+  } else {
+    color = colors.gray75;
+    zIndex = 10; // 👈 무조건 아래
+  }
+} else if (filterCheck) {
+  show = true;
+  if (isCheckValid) {
+    color = colors.red;
+    labelText = `${checkD}`;
+    zIndex = 1000;
+  } else {
+    color = colors.gray75;
+    zIndex = 10; // 👈 무조건 아래
+  }
+} else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
+  show = true;
+  if (hasDate && row[idx.checkDate] !== expire) {
+    color = colors.gray;
+    zIndex = 10; // 👈 무조건 아래
+  } else {
+    color = team.includes("강남팀") ? colors.green : colors.blue;
+    zIndex = 1000;
+  }
+}
 
     if (!show) return;
 
