@@ -252,7 +252,24 @@ async function fetchTSVandPlot() {
   markerData = []; // 이전 데이터 초기화
   const res = await fetch(tsvUrl);
   const tsvText = await res.text();
-  const rows = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
+
+  // rows 가져오기
+  const rowsRaw = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
+
+  // 날짜가 있는 행과 없는 행 분리
+  const rowsWithDate = [];
+  const rowsWithoutDate = [];
+  rowsRaw.forEach(row => {
+    const date = row[0]?.trim();
+    if (date) {
+      rowsWithDate.push(row);
+    } else {
+      rowsWithoutDate.push(row);
+    }
+  });
+
+  // 날짜 있는 것 먼저, 없는 것 나중에
+  const rows = rowsWithDate.concat(rowsWithoutDate);
 
   const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
   const filterGangnam = checkedTeams.includes("강남팀");
@@ -266,6 +283,8 @@ async function fetchTSVandPlot() {
   const newKeys = new Set();
 
   rows.forEach(row => {
+    if (!row[0] || row[0].trim() === "") return; // 현장명 없으면 제외
+
     const team = row[idx.team] || "";
     if (team.includes("해지")) return;
 
@@ -305,40 +324,40 @@ async function fetchTSVandPlot() {
     };
 
     if (searchTerm && matchesSearch()) {
-      show = true;
-      color = colors.orange;
-      labelText = "";
-      zIndex = 1000;
-    } else if (filterNeed) {
-      show = true;
-      if (isNeed) {
-        color = colors.red;
-        labelText = `${Math.abs(dDay)}`;
-        zIndex = 1000;
-      } else {
-        color = colors.gray75;
-        zIndex = 100;
-      }
-    } else if (filterCheck) {
-      show = true;
-      if (isCheckValid) {
-        color = colors.red;
-        labelText = `${checkD}`;
-        zIndex = 1000;
-      } else {
-        color = colors.gray75;
-        zIndex = 100;
-      }
-    } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
-      show = true;
-      if (hasDate && row[idx.checkDate] !== expire) {
-        color = colors.gray;
-        zIndex = 100;
-      } else {
-        color = team.includes("강남팀") ? colors.green : colors.blue;
-        zIndex = 1000;
-      }
-    }
+  show = true;
+  color = colors.orange;
+  labelText = "";
+  zIndex = 1000;
+} else if (filterNeed) {
+  show = true;
+  if (isNeed) {
+    color = colors.red;
+    labelText = `${Math.abs(dDay)}`;
+    zIndex = 1000;
+  } else {
+    color = colors.gray75;
+    zIndex = 10; // 👈 무조건 아래
+  }
+} else if (filterCheck) {
+  show = true;
+  if (isCheckValid) {
+    color = colors.red;
+    labelText = `${checkD}`;
+    zIndex = 1000;
+  } else {
+    color = colors.gray75;
+    zIndex = 10; // 👈 무조건 아래
+  }
+} else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
+  show = true;
+  if (hasDate && row[idx.checkDate] !== expire) {
+    color = colors.gray;
+    zIndex = 10; // 👈 무조건 아래
+  } else {
+    color = team.includes("강남팀") ? colors.green : colors.blue;
+    zIndex = 1000;
+  }
+}
 
     if (!show) return;
 
@@ -420,7 +439,6 @@ const popupHtml = entries.map(row => {
       marker.__meta = { color, labelText };
       markersMap[key] = marker;
 
-      // ✅ markerData에 등록하여 검색 시 반응하게 하기
       markerData.push({
         marker,
         popupHtmlOriginal: wrappedPopup,
@@ -446,7 +464,6 @@ const popupHtml = entries.map(row => {
     }
   });
 
-  // ✅ 검색어에 따른 마커 반영
   updateMarkerHighlighting();
 }
     // ==== UTILITIES ====
@@ -513,7 +530,9 @@ const popupHtml = entries.map(row => {
     }
 
     const newColor = term ? (hit ? colors.orange : colors.gray75) : o.baseColor;
-    const zIndex = term ? (hit ? 1000 : 100) : (newColor === colors.orange ? 1000 : 100);
+    const zIndex = term
+  ? (hit ? 1000 : 10) // 👈 검색 안맞으면 zIndex 낮게
+  : (newColor === colors.gray || newColor === colors.gray75 ? 10 : 1000);
 
     o.marker.setIcon(L.divIcon({
       html: o.createMarkerHtml(newColor),
@@ -538,13 +557,20 @@ async function loadAlarmTsv() {
   const res = await fetch(alarmTsv);
   const txt = await res.text();
   const rows = txt.trim().split("\n").slice(1).map(r => r.split("\t"));
-  rows.sort((a, b) => {
-    const da = a[0]?.trim(), db = b[0]?.trim();
-    if (!da && !db) return 0;
-    if (!da) return 1;
-    if (!db) return -1;
-    return db.localeCompare(da);
-  });
+rows.sort((a, b) => {
+  const da = a[0]?.trim();
+  const db = b[0]?.trim();
+
+  const dateA = new Date(da);
+  const dateB = new Date(db);
+
+  if (isNaN(dateA) && isNaN(dateB)) return 0;
+  if (isNaN(dateA)) return 1;
+  if (isNaN(dateB)) return -1;
+
+  // 최신순: 큰 날짜가 위로
+  return dateB.getTime() - dateA.getTime();
+});
 
   const isMobile = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
   const list = document.querySelector(".alarm-list");
