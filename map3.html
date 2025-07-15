@@ -524,13 +524,15 @@ const popupHtml = entries.map(row => {
       return diff>=0?`D-${diff}`:`D+${Math.abs(diff)}`;
     }
     function calcDateDiffNumber(ds){
-      if(!ds) return null;
-      let c=ds.replace(/[^\d\-]/g,'').replace(/-{2,}/g,'-');
-      if(/^\d{8}$/.test(c)) c=c.replace(/^(\d{4})(\d{2})(\d{2})$/,'$1-$2-$3');
-      const d=new Date(c), now=new Date();
-      if(isNaN(d)) return null;
-      return Math.floor((d.getTime()-now.getTime())/(1000*60*60*24));
-    }
+  if(!ds) return null;
+  let c = ds.replace(/[^\d\-]/g,'').replace(/-{2,}/g,'-');
+  if(/^\d{8}$/.test(c)) c = c.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+  const d = new Date(c);
+  const now = new Date();
+  now.setHours(0,0,0,0); // 👉 자정 기준으로 비교
+  if(isNaN(d)) return null;
+  return Math.floor((d.getTime() - now.getTime()) / (1000*60*60*24));
+}
     function isValidDate(ds){
       const d=new Date(ds);
       return !isNaN(d);
