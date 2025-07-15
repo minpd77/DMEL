@@ -336,7 +336,7 @@ async function fetchTSVandPlot() {
     zIndex = 1000;
   } else {
     color = colors.gray75;
-    zIndex = 10;  // 👈 회색은 항상 가장 아래
+    zIndex = 10; // 👈 무조건 아래
   }
 } else if (filterCheck) {
   show = true;
@@ -346,18 +346,19 @@ async function fetchTSVandPlot() {
     zIndex = 1000;
   } else {
     color = colors.gray75;
-    zIndex = 10;  // 👈 회색은 항상 가장 아래
+    zIndex = 10; // 👈 무조건 아래
   }
 } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
   show = true;
   if (hasDate && row[idx.checkDate] !== expire) {
     color = colors.gray;
-    zIndex = 10;  // 👈 회색은 항상 가장 아래
+    zIndex = 10; // 👈 무조건 아래
   } else {
     color = team.includes("강남팀") ? colors.green : colors.blue;
     zIndex = 1000;
   }
 }
+
 
     if (!show) return;
 
