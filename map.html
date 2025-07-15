@@ -382,26 +382,36 @@ async function fetchTSVandPlot() {
       }
     } else {
       const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
-      const popupHtml = entries.map(row => {
-  const sn = row[idx.siteName] || "", addr = row[idx.address] || "", sp = row[idx.special] || "",
-        cd = row[idx.checkDate] || "", wr = row[idx.wNum] || "", ct = row[idx.contact] || "",
-        md = row[idx.model] || "", fn = row[idx.fan] || "", bt = row[idx.biTongNum] || "",
-        eq = row[idx.biTongEquip] || "", ex = row[idx.expire] || "";
+const popupHtml = entries.map(row => {
+  const sn = row[idx.siteName] || "", 
+        addr = row[idx.address] || "", 
+        sp = row[idx.special] || "",
+        cd = row[idx.checkDate] || "",        // 점검 (L열)
+        checkDateReal = row[8] || "",         // 검사일 (I열)
+        wr = row[idx.wNum] || "", 
+        ct = row[idx.contact] || "",
+        md = row[idx.model] || "", 
+        fn = row[idx.fan] || "", 
+        bt = row[idx.biTongNum] || "",
+        eq = row[idx.biTongEquip] || "", 
+        ex = row[idx.expire] || "";
+
   const wp = wr.replace(/\D/g, '').padStart(7, "0");
   const dm = calcDateDiff(ex);
   const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
+
   return `
     <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
     <a href="${nlink}" target="_blank">${addr}</a><br/>
-📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
-특이사항: ${sp}<br/>
-점검: ${cd}<br/>
-기종: ${md}<br/>
-Fan: ${fn}<br/>
-비통번호: ${bt}<br/>
-비통장비: ${eq}<br/>
-유효기간: ${ex} ${dm}<br/>
-<strong style="color:red;">검사일: ${cd}</strong>
+    📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
+    특이사항: ${sp}<br/>
+    점검: ${cd}<br/>
+    기종: ${md}<br/>
+    Fan: ${fn}<br/>
+    비통번호: ${bt}<br/>
+    비통장비: ${eq}<br/>
+    유효기간: ${ex} ${dm}<br/>
+    <strong style="color:red;">검사일: ${checkDateReal}</strong>
     <hr/>`;
 }).join("");
 
