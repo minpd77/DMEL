@@ -302,7 +302,7 @@ async function fetchTSVandPlot() {
     const checkDate = row[8] || ""; // I열
 
     const dDay = calcDateDiffNumber(expire);
-    const isNeed = dDay !== null && dDay <= 0 && dDay >= -60;
+    const isNeed = dDay !== null && dDay >= 0 && dDay <= 60;
     if (isNeed) cntNeedNum++;
 
     const checkD = calcDateDiffNumber(checkDate);
