@@ -374,89 +374,124 @@ async function fetchTSVandPlot() {
   cntCheck.textContent = ` (${cntCheckNum})`;
 
   Object.entries(coordGroups).forEach(([key, group]) => {
-    const { lat, lng, entries, color, labelText, zIndex } = group;
-    let label = labelText;
-    if (!label && entries.length > 1) label = `${entries.length}`;
+  const { lat, lng, entries, color, labelText, zIndex } = group;
+  
+  // ✅ 첫 번째 현장명 가져오기 (여러 개면 첫 번째만 표시)
+  const siteName = entries[0][idx.siteName] || "";
+  
+  let label = labelText;
+  if (!label && entries.length > 1) label = `${entries.length}`;
 
-    const labelHtml = label
-      ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
-      : "";
+  const labelHtml = label
+    ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
+    : "";
 
-    const html = `<div style="position:relative;width:18px;height:18px;">
-      <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
-      ${labelHtml}
-    </div>`;
+  // ✅ 마커 아래 표시될 현장명 HTML
+  const markerNameHtml = `<div style="
+    position:absolute;
+    top:20px; left:50%; transform:translateX(-50%);
+    font-size:11px; color:black; background:white;
+    padding:2px 4px; border-radius:4px; white-space:nowrap;
+    box-shadow:0 1px 3px rgba(0,0,0,0.2);
+  ">
+    ${siteName}
+  </div>`;
 
-    const icon = L.divIcon({
-      html, iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -9], className: ""
-    });
+  // ✅ 최종 마커 HTML
+  const html = `<div style="position:relative;width:18px;height:18px;">
+    <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
+    ${labelHtml}
+    ${markerNameHtml}   <!-- ✅ 현장명 추가 -->
+  </div>`;
 
-    const existing = markersMap[key];
-    if (existing) {
-      const old = existing.__meta || {};
-      const changed = old.color !== color || old.labelText !== labelText;
-      if (changed) {
-        existing.setIcon(icon);
-        existing.setZIndexOffset(zIndex);
-        existing.__meta = { color, labelText };
-      }
-    } else {
-      const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
-const popupHtml = entries.map(row => {
-  const sn = row[idx.siteName] || "", 
-        addr = row[idx.address] || "", 
-        sp = row[idx.special] || "",
-        cd = row[idx.checkDate] || "",        // 점검 (L열)
-        checkDateReal = row[8] || "",         // 검사일 (I열)
-        wr = row[idx.wNum] || "", 
-        ct = row[idx.contact] || "",
-        md = row[idx.model] || "", 
-        fn = row[idx.fan] || "", 
-        bt = row[idx.biTongNum] || "",
-        eq = row[idx.biTongEquip] || "", 
-        ex = row[idx.expire] || "";
-
-  const wp = wr.replace(/\D/g, '').padStart(7, "0");
-  const dm = calcDateDiff(ex);
-  const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
-
-  return `
-    <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
-    <a href="${nlink}" target="_blank">${addr}</a><br/>
-    📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
-    특이사항: ${sp}<br/>
-    점검: ${cd}<br/>
-    기종: ${md}<br/>
-    Fan: ${fn}<br/>
-    비통번호: ${bt}<br/>
-    비통장비: ${eq}<br/>
-    유효기간: ${ex} ${dm}<br/>
-    <strong style="color:red;">검사일: ${checkDateReal}</strong>
-    <hr/>`;
-}).join("");
-
-      const wrappedPopup = `<div class="popup-scroll">${popupHtml}</div>`.replace(/<hr\/>\s*<\/div>$/, '</div>');
-      marker.bindPopup(wrappedPopup);
-      marker.__meta = { color, labelText };
-      markersMap[key] = marker;
-
-      markerData.push({
-        marker,
-        popupHtmlOriginal: wrappedPopup,
-        baseColor: color,
-        labelText,
-        createMarkerHtml: (c) => {
-          const labelHtml = label
-            ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
-            : "";
-          return `<div style="position:relative;width:18px;height:18px;">
-            <div style="background-color:${c};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
-            ${labelHtml}
-          </div>`;
-        }
-      });
-    }
+  const icon = L.divIcon({
+    html,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -9],
+    className: ""
   });
+
+  const existing = markersMap[key];
+  if (existing) {
+    const old = existing.__meta || {};
+    const changed = old.color !== color || old.labelText !== labelText;
+    if (changed) {
+      existing.setIcon(icon);
+      existing.setZIndexOffset(zIndex);
+      existing.__meta = { color, labelText };
+    }
+  } else {
+    const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
+
+    const popupHtml = entries.map(row => {
+      const sn = row[idx.siteName] || "",
+            addr = row[idx.address] || "",
+            sp = row[idx.special] || "",
+            cd = row[idx.checkDate] || "",
+            checkDateReal = row[8] || "", // 검사일 (I열)
+            wr = row[idx.wNum] || "",
+            ct = row[idx.contact] || "",
+            md = row[idx.model] || "",
+            fn = row[idx.fan] || "",
+            bt = row[idx.biTongNum] || "",
+            eq = row[idx.biTongEquip] || "",
+            ex = row[idx.expire] || "";
+
+      const wp = wr.replace(/\D/g, '').padStart(7, "0");
+      const dm = calcDateDiff(ex);
+      const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
+
+      return `
+        <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
+        <a href="${nlink}" target="_blank">${addr}</a><br/>
+        📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
+        특이사항: ${sp}<br/>
+        점검: ${cd}<br/>
+        기종: ${md}<br/>
+        Fan: ${fn}<br/>
+        비통번호: ${bt}<br/>
+        비통장비: ${eq}<br/>
+        유효기간: ${ex} ${dm}<br/>
+        <strong style="color:red;">검사일: ${checkDateReal}</strong>
+        <hr/>`;
+    }).join("");
+
+    const wrappedPopup = `<div class="popup-scroll">${popupHtml}</div>`.replace(/<hr\/>\s*<\/div>$/, '</div>');
+    marker.bindPopup(wrappedPopup);
+    marker.__meta = { color, labelText };
+    markersMap[key] = marker;
+
+    markerData.push({
+      marker,
+      popupHtmlOriginal: wrappedPopup,
+      baseColor: color,
+      labelText,
+      createMarkerHtml: (c) => {
+        const labelHtml = label
+          ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
+          : "";
+
+        // ✅ 검색 시에도 현장명 유지
+        const markerNameHtml = `<div style="
+          position:absolute;
+          top:20px; left:50%; transform:translateX(-50%);
+          font-size:11px; color:black; background:white;
+          padding:2px 4px; border-radius:4px; white-space:nowrap;
+          box-shadow:0 1px 3px rgba(0,0,0,0.2);
+        ">
+          ${siteName}
+        </div>`;
+
+        return `<div style="position:relative;width:18px;height:18px;">
+          <div style="background-color:${c};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
+          ${labelHtml}
+          ${markerNameHtml}   <!-- ✅ 검색 시에도 현장명 유지 -->
+        </div>`;
+      }
+    });
+  }
+});
 
   Object.keys(markersMap).forEach(key => {
     if (!newKeys.has(key)) {
