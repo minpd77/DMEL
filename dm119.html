@@ -111,16 +111,12 @@
       max-height: none;
       overflow: visible;
       height: auto;
-      color: #333;
+      word-break: break-word;
     }
-    #resultBox.loading {
-      color: #d32f2f;
-      font-weight: 900;
-    }
-    .btn-group {
+    .button-group {
       display: flex;
       gap: 10px;
-      margin-top: 18px;
+      margin-top: 12px;
     }
     button {
       flex: 1;
@@ -138,13 +134,20 @@
     button:active {
       background: #45a049;
     }
-    button.refresh {
-      background: #888;
+    #copyNotice {
+      margin-top: 8px;
+      height: 24px;
+      font-size: 0.9rem;
+      color: #4caf50;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      user-select: none;
+      text-align: center;
     }
-    button.refresh:active {
-      background: #555;
+    #copyNotice.visible {
+      opacity: 1;
     }
-
     @media (max-width: 480px) {
       h2 {
         font-size: 1.3rem;
@@ -157,10 +160,15 @@
         font-size: 14px;
         padding: 9px 12px;
       }
-      .btn-group button {
+      button {
         font-size: 1.1rem;
         padding: 13px;
       }
+    }
+    /* 로딩 텍스트 스타일 */
+    #resultBox.loading {
+      color: red;
+      font-weight: 900;
     }
   </style>
 </head>
@@ -195,11 +203,13 @@
     <!-- 결과 -->
     <div id="resultBox" class="loading">데이터를 불러오는 중...</div>
 
-    <!-- 버튼 그룹: 새로고침 + 복사 -->
-    <div class="btn-group">
-      <button type="button" class="refresh" onclick="resetAll()">🔄 새로고침</button>
+    <!-- 버튼 그룹 -->
+    <div class="button-group">
+      <button type="button" onclick="resetAll()">🔄 새로고침</button>
       <button type="button" onclick="copyResult()">📋 복사하기</button>
+      <button type="button" onclick="shareResult()">🔗 공유하기</button>
     </div>
+    <div id="copyNotice"></div>
   </div>
 
   <script>
@@ -207,27 +217,27 @@
 
     let siteData = [];
     let selectedSite = null;
+
     const searchBox = document.getElementById("searchBox");
     const memoBox = document.getElementById("memoBox");
     const phoneBox = document.getElementById("phoneBox");
     const suggestionsDiv = document.getElementById("suggestions");
     const resultBox = document.getElementById("resultBox");
     const selectBox = document.getElementById("selectBox");
+    const copyNotice = document.getElementById("copyNotice");
 
-    // 라디오 클릭 시 한번 더 클릭하면 해제 처리
+    // 라디오 버튼 토글 기능 (한번 더 클릭하면 해제)
     selectBox.addEventListener("click", (e) => {
       if (e.target.tagName === "INPUT" && e.target.type === "radio") {
         if (e.target.wasChecked) {
           e.target.checked = false;
           e.target.wasChecked = false;
+          updateResult();
         } else {
+          [...selectBox.querySelectorAll('input[type="radio"]')].forEach(radio => radio.wasChecked = false);
           e.target.wasChecked = true;
-          // 다른 라디오들 체크 상태 해제
-          [...selectBox.querySelectorAll('input[type="radio"]')]
-            .filter(r => r !== e.target)
-            .forEach(r => r.wasChecked = false);
+          updateResult();
         }
-        updateResult();
       }
     });
 
@@ -267,7 +277,7 @@
       loadSiteData().then(data => {
         siteData = data;
         if (siteData.length > 0) {
-          resultBox.textContent = "현장명을 검색하세요.";
+          resultBox.textContent = "현장명·승강기번호·주소를 검색하세요.";
           resultBox.classList.remove("loading");
         } else {
           resultBox.textContent = "❌ 데이터를 불러올 수 없습니다.";
@@ -320,6 +330,7 @@
 
     memoBox.addEventListener("input", updateResult);
     phoneBox.addEventListener("input", updateResult);
+    selectBox.addEventListener("change", updateResult);
 
     function updateResult() {
       if (!selectedSite) {
@@ -340,11 +351,8 @@
 
       const addrInfo = shortenAddress(selectedSite.address);
 
-      // 첫 줄: 신호 + 현장명 + 승강기번호
       const firstLine = `${signalText}${siteName} ${elevator}`;
 
-      // 포맷팅: 메모 앞에 줄바꿈 한 줄 더, 나머지는 줄바꿈
-      // modelInfo 맨 뒤에 이어 붙임
       let formatted = `${firstLine}
 ${phone ? phone : ""}
 ${addrInfo}
@@ -359,32 +367,72 @@ ${modelInfo ? modelInfo : ""}`.trim();
     function copyResult() {
       const text = resultBox.textContent.trim();
       if (!text || text === "현장을 선택하세요." || text.includes("데이터를 불러오는 중")) {
-        alert("먼저 현장을 선택하세요!");
+        copyNotice.textContent = "";
         return;
       }
       navigator.clipboard.writeText(text).then(() => {
-        alert("📋 복사 완료!\n\n" + text);
+        copyNotice.textContent = "📋 복사 완료!";
+        copyNotice.classList.add("visible");
+        setTimeout(() => {
+          copyNotice.classList.remove("visible");
+        }, 2500);
       }).catch(() => {
-        alert("복사에 실패했습니다. 직접 복사해주세요.");
+        copyNotice.textContent = "복사에 실패했습니다. 직접 복사해주세요.";
+        copyNotice.classList.add("visible");
+        setTimeout(() => {
+          copyNotice.classList.remove("visible");
+        }, 3000);
       });
     }
 
     function resetAll() {
-      // 선택 박스 초기화
       [...selectBox.querySelectorAll('input[type="radio"]')].forEach(radio => {
         radio.checked = false;
         radio.wasChecked = false;
       });
-      // 입력란 초기화
       searchBox.value = "";
       memoBox.value = "";
       phoneBox.value = "";
       suggestionsDiv.innerHTML = "";
       selectedSite = null;
 
-      resultBox.textContent = "현장명을 검색하세요.";
+      resultBox.textContent = "현장명·승강기번호·주소를 검색하세요.";
       resultBox.classList.remove("loading");
+      copyNotice.textContent = "";
+      copyNotice.classList.remove("visible");
       searchBox.focus();
+    }
+
+    function shareResult() {
+      const text = resultBox.textContent.trim();
+      if (!text || text === "현장을 선택하세요." || text.includes("데이터를 불러오는 중")) {
+        copyNotice.textContent = "";
+        return;
+      }
+      if (navigator.share) {
+        navigator.share({
+          title: '현장 신고 메모',
+          text: text,
+        }).then(() => {
+          copyNotice.textContent = "공유가 완료되었습니다.";
+          copyNotice.classList.add("visible");
+          setTimeout(() => {
+            copyNotice.classList.remove("visible");
+          }, 2500);
+        }).catch(() => {
+          copyNotice.textContent = "공유가 취소되었거나 실패했습니다.";
+          copyNotice.classList.add("visible");
+          setTimeout(() => {
+            copyNotice.classList.remove("visible");
+          }, 2500);
+        });
+      } else {
+        copyNotice.textContent = "이 브라우저는 공유 기능을 지원하지 않습니다.";
+        copyNotice.classList.add("visible");
+        setTimeout(() => {
+          copyNotice.classList.remove("visible");
+        }, 2500);
+      }
     }
   </script>
 </body>
