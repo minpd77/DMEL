@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>현장 검색 & 메모</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background: #f9f9f9;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      width: 95%;
+      max-width: 480px;
+      background: #fff;
+      padding: 15px 20px 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgb(0 0 0 / 0.1);
+      box-sizing: border-box;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+    #searchBox, #memoBox, #phoneBox {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-weight: 500;
+      transition: border-color 0.2s ease-in-out;
+    }
+    #searchBox:focus, #memoBox:focus, #phoneBox:focus {
+      outline: none;
+      border-color: #4caf50;
+      box-shadow: 0 0 5px #4caf50aa;
+    }
+    textarea {
+      resize: none;
+      min-height: 60px;
+    }
+    .suggestions {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      background: #fff;
+      box-sizing: border-box;
+      box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
+      font-size: 15px;
+      user-select: none;
+      z-index: 1000;
+      position: relative;
+    }
+    .suggestion-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+      transition: background-color 0.15s ease;
+    }
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+    .suggestion-item:hover {
+      background-color: #e6f7ff;
+    }
+    #resultBox {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f5f5f5;
+      border: 2px solid #4caf50;
+      border-radius: 8px;
+      min-height: 50px;
+      font-weight: 600;
+      word-break: break-word;
+      font-size: 1rem;
+    }
+    label {
+      font-weight: 700;
+      margin-top: 15px;
+      display: block;
+      font-size: 1rem;
+    }
+    button {
+      width: 100%;
+      padding: 15px;
+      background: #4caf50;
+      color: white;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 8px;
+      margin-top: 18px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+    }
+    button:active {
+      background: #45a049;
+    }
+
+    @media (max-width: 480px) {
+      h2 {
+        font-size: 1.3rem;
+      }
+      #searchBox, #memoBox, #phoneBox {
+        font-size: 15px;
+        padding: 10px 12px;
+      }
+      .suggestion-item {
+        font-size: 14px;
+        padding: 9px 12px;
+      }
+      button {
+        font-size: 1.1rem;
+        padding: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🔍 현장 검색 & 신고 메모</h2>
+
+    <!-- 검색 -->
+    <input type="text" id="searchBox" placeholder="현장명·승강기번호·주소 일부 입력" autocomplete="off" />
+    <div id="suggestions" class="suggestions"></div>
+
+    <!-- 메모 입력 -->
+    <label for="memoBox">📌 신고내용</label>
+    <textarea id="memoBox" rows="2" placeholder="여기에 신고내용을 적으세요"></textarea>
+
+    <!-- 연락처 -->
+    <label for="phoneBox">📞 연락처</label>
+    <input type="text" id="phoneBox" placeholder="신고자 연락처 입력" />
+
+    <!-- 결과 -->
+    <div id="resultBox">데이터를 불러오는 중...</div>
+
+    <!-- 복사 버튼 -->
+    <button type="button" onclick="copyResult()">📋 복사하기</button>
+  </div>
+
+  <script>
+    // ✅ Google Sheets → TSV URL
+    const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1374895459&single=true&output=tsv";
+
+    let siteData = [];
+    let selectedSite = null;
+
+    const searchBox = document.getElementById("searchBox");
+    const memoBox = document.getElementById("memoBox");
+    const phoneBox = document.getElementById("phoneBox");
+    const suggestionsDiv = document.getElementById("suggestions");
+    const resultBox = document.getElementById("resultBox");
+
+    // ✅ 페이지 로딩되면 TSV 불러오기
+    window.addEventListener("DOMContentLoaded", () => {
+      loadSiteData().then(data => {
+        siteData = data;
+        if (siteData.length > 0) {
+          resultBox.textContent = "현장을 검색하세요.";
+        } else {
+          resultBox.textContent = "❌ 데이터를 불러올 수 없습니다.";
+        }
+      }).catch(err => {
+        console.error(err);
+        resultBox.textContent = "⚠️ 데이터 로드 실패";
+      });
+    });
+
+    // ✅ TSV → siteData 변환
+    async function loadSiteData() {
+      const response = await fetch(SHEET_TSV_URL);
+      const tsvText = await response.text();
+      const rows = tsvText.trim().split("\n").map(r => r.split("\t"));
+
+      // 헤더 제외
+      return rows.slice(1).map(r => ({
+        siteName: (r[0] || "").trim(),     // A열
+        zone: (r[1] || "").trim(),         // B열
+        address: (r[2] || "").trim(),      // C열
+        elevator: normalizeElevatorNumber(r[3] || ""), // D열
+        extra: (r[6] || "").trim()         // G열
+      }));
+    }
+
+    // ✅ 승강기번호 정규화 (0000-000)
+    function normalizeElevatorNumber(input) {
+      const digits = (input || "").replace(/\D/g, "");
+      if (!digits) return "";
+      const padded = digits.padStart(7, "0");
+      return padded.slice(0, 4) + "-" + padded.slice(4);
+    }
+
+    // ✅ 띄어쓰기 제거 + 소문자 변환
+    function normalize(str) {
+      return str.toLowerCase().replace(/\s+/g, "");
+    }
+
+    // ✅ 검색창 입력 → 자동완성 표시
+    searchBox.addEventListener("input", function () {
+      const term = normalize(this.value);
+      suggestionsDiv.innerHTML = "";
+
+      if (term.length < 2) {
+        updateResult();
+        return;
+      }
+
+      const filtered = siteData.filter(item => {
+        return (
+          normalize(item.siteName).includes(term) ||
+          normalize(item.address).includes(term) ||
+          normalize(item.elevator).includes(term)
+        );
+      }).slice(0, 20);
+
+      filtered.forEach(item => {
+        const div = document.createElement("div");
+        div.classList.add("suggestion-item");
+        div.textContent = `${item.siteName} | ${item.elevator} | ${item.address}`;
+        div.addEventListener("click", () => {
+          selectSite(item);
+          suggestionsDiv.innerHTML = "";
+        });
+        suggestionsDiv.appendChild(div);
+      });
+    });
+
+    // ✅ 자동완성에서 현장 선택 시
+    function selectSite(item) {
+      selectedSite = item;
+      searchBox.value = item.siteName;
+      updateResult();
+    }
+
+    // ✅ 메모/전화 입력 시 결과 갱신
+    memoBox.addEventListener("input", updateResult);
+    phoneBox.addEventListener("input", updateResult);
+
+    // ✅ 최종 결과 생성
+    function updateResult() {
+      if (!selectedSite) {
+        resultBox.textContent = "현장을 선택하세요.";
+        return;
+      }
+
+      let zoneLabel = selectedSite.zone.replace("팀", "").trim();
+      zoneLabel = zoneLabel ? `[${zoneLabel}]` : "";
+
+      const baseInfo = [
+        selectedSite.siteName,
+        selectedSite.elevator,
+        selectedSite.extra
+      ].filter(x => x).join(" ");
+
+      const addrInfo = selectedSite.address ? selectedSite.address + " /" : "";
+      const memo = memoBox.value.trim();
+      const phone = phoneBox.value.trim();
+      const extraInfo = [memo, phone].filter(x => x).join(" ");
+
+      let resultLine = `${baseInfo} / ${addrInfo} ${extraInfo} ${zoneLabel}`.trim();
+      resultLine = resultLine.replace(/\s+\/\s+\//g, " / ");
+      resultBox.textContent = resultLine;
+    }
+
+    // ✅ 복사 기능
+    function copyResult() {
+      const text = resultBox.textContent.trim();
+      if (!text || text === "현장을 선택하세요." || text.includes("데이터를 불러오는 중")) {
+        alert("먼저 현장을 선택하세요!");
+        return;
+      }
+      navigator.clipboard.writeText(text).then(() => {
+        alert("📋 복사 완료!\n\n" + text);
+      }).catch(() => {
+        alert("복사에 실패했습니다. 직접 복사해주세요.");
+      });
+    }
+  </script>
+</body>
+</html>
