@@ -27,6 +27,31 @@
       margin-bottom: 20px;
       font-size: 1.5rem;
     }
+    /* 선택 박스 스타일 */
+    .select-box {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 15px;
+      user-select: none;
+    }
+    .select-box label {
+      cursor: pointer;
+      padding: 8px 16px;
+      border: 2px solid #4caf50;
+      border-radius: 25px;
+      font-weight: 600;
+      color: #4caf50;
+      transition: background-color 0.2s, color 0.2s;
+      user-select: none;
+    }
+    .select-box input[type="radio"] {
+      display: none;
+    }
+    .select-box input[type="radio"]:checked + label {
+      background-color: #4caf50;
+      color: white;
+    }
     #searchBox, #memoBox, #phoneBox {
       width: 100%;
       padding: 12px 14px;
@@ -81,30 +106,43 @@
       border-radius: 8px;
       min-height: 50px;
       font-weight: 600;
-      word-break: break-word;
+      white-space: pre-wrap;
       font-size: 1rem;
+      max-height: none;
+      overflow: visible;
+      height: auto;
+      color: #333;
     }
-    label {
-      font-weight: 700;
-      margin-top: 15px;
-      display: block;
-      font-size: 1rem;
+    #resultBox.loading {
+      color: #d32f2f;
+      font-weight: 900;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
     }
     button {
-      width: 100%;
+      flex: 1;
       padding: 15px;
       background: #4caf50;
       color: white;
       font-size: 1.2rem;
       border: none;
       border-radius: 8px;
-      margin-top: 18px;
       cursor: pointer;
       font-weight: 600;
       transition: background-color 0.2s ease;
+      user-select: none;
     }
     button:active {
       background: #45a049;
+    }
+    button.refresh {
+      background: #888;
+    }
+    button.refresh:active {
+      background: #555;
     }
 
     @media (max-width: 480px) {
@@ -119,7 +157,7 @@
         font-size: 14px;
         padding: 9px 12px;
       }
-      button {
+      .btn-group button {
         font-size: 1.1rem;
         padding: 13px;
       }
@@ -129,6 +167,18 @@
 <body>
   <div class="container">
     <h2>🔍 현장 검색 & 신고 메모</h2>
+
+    <!-- 선택 박스 -->
+    <div class="select-box" id="selectBox">
+      <input type="radio" name="signal" id="stop" value="정지" />
+      <label for="stop">정지</label>
+
+      <input type="radio" name="signal" id="complain" value="민원" />
+      <label for="complain">민원</label>
+
+      <input type="radio" name="signal" id="trapped" value="승객갇힘" />
+      <label for="trapped">승객갇힘</label>
+    </div>
 
     <!-- 검색 -->
     <input type="text" id="searchBox" placeholder="현장명·승강기번호·주소 일부 입력" autocomplete="off" />
@@ -143,57 +193,57 @@
     <input type="text" id="phoneBox" placeholder="신고자 연락처 입력" />
 
     <!-- 결과 -->
-    <div id="resultBox">데이터를 불러오는 중...</div>
+    <div id="resultBox" class="loading">데이터를 불러오는 중...</div>
 
-    <!-- 복사 버튼 -->
-    <button type="button" onclick="copyResult()">📋 복사하기</button>
+    <!-- 버튼 그룹: 새로고침 + 복사 -->
+    <div class="btn-group">
+      <button type="button" class="refresh" onclick="resetAll()">🔄 새로고침</button>
+      <button type="button" onclick="copyResult()">📋 복사하기</button>
+    </div>
   </div>
 
   <script>
-    // ✅ Google Sheets → TSV URL
     const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1374895459&single=true&output=tsv";
 
     let siteData = [];
     let selectedSite = null;
-
     const searchBox = document.getElementById("searchBox");
     const memoBox = document.getElementById("memoBox");
     const phoneBox = document.getElementById("phoneBox");
     const suggestionsDiv = document.getElementById("suggestions");
     const resultBox = document.getElementById("resultBox");
+    const selectBox = document.getElementById("selectBox");
 
-    // ✅ 페이지 로딩되면 TSV 불러오기
-    window.addEventListener("DOMContentLoaded", () => {
-      loadSiteData().then(data => {
-        siteData = data;
-        if (siteData.length > 0) {
-          resultBox.textContent = "현장을 검색하세요.";
+    // 라디오 클릭 시 한번 더 클릭하면 해제 처리
+    selectBox.addEventListener("click", (e) => {
+      if (e.target.tagName === "INPUT" && e.target.type === "radio") {
+        if (e.target.wasChecked) {
+          e.target.checked = false;
+          e.target.wasChecked = false;
         } else {
-          resultBox.textContent = "❌ 데이터를 불러올 수 없습니다.";
+          e.target.wasChecked = true;
+          // 다른 라디오들 체크 상태 해제
+          [...selectBox.querySelectorAll('input[type="radio"]')]
+            .filter(r => r !== e.target)
+            .forEach(r => r.wasChecked = false);
         }
-      }).catch(err => {
-        console.error(err);
-        resultBox.textContent = "⚠️ 데이터 로드 실패";
-      });
+        updateResult();
+      }
     });
 
-    // ✅ TSV → siteData 변환
     async function loadSiteData() {
       const response = await fetch(SHEET_TSV_URL);
       const tsvText = await response.text();
       const rows = tsvText.trim().split("\n").map(r => r.split("\t"));
-
-      // 헤더 제외
       return rows.slice(1).map(r => ({
-        siteName: (r[0] || "").trim(),     // A열
-        zone: (r[1] || "").trim(),         // B열
-        address: (r[2] || "").trim(),      // C열
-        elevator: normalizeElevatorNumber(r[3] || ""), // D열
-        extra: (r[6] || "").trim()         // G열
+        siteName: (r[0] || "").trim(),
+        zone: (r[1] || "").trim(),
+        address: (r[2] || "").trim(),
+        elevator: normalizeElevatorNumber(r[3] || ""),
+        extra: (r[6] || "").trim()
       }));
     }
 
-    // ✅ 승강기번호 정규화 (0000-000)
     function normalizeElevatorNumber(input) {
       const digits = (input || "").replace(/\D/g, "");
       if (!digits) return "";
@@ -201,15 +251,39 @@
       return padded.slice(0, 4) + "-" + padded.slice(4);
     }
 
-    // ✅ 띄어쓰기 제거 + 소문자 변환
     function normalize(str) {
       return str.toLowerCase().replace(/\s+/g, "");
     }
 
-    // ✅ 검색창 입력 → 자동완성 표시
+    function shortenAddress(addr) {
+      const match = addr.match(/.*?구/);
+      return match ? match[0] : addr;
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      resultBox.textContent = "데이터를 불러오는 중...";
+      resultBox.classList.add("loading");
+
+      loadSiteData().then(data => {
+        siteData = data;
+        if (siteData.length > 0) {
+          resultBox.textContent = "현장명을 검색하세요.";
+          resultBox.classList.remove("loading");
+        } else {
+          resultBox.textContent = "❌ 데이터를 불러올 수 없습니다.";
+          resultBox.classList.remove("loading");
+        }
+      }).catch(err => {
+        console.error(err);
+        resultBox.textContent = "⚠️ 데이터 로드 실패";
+        resultBox.classList.remove("loading");
+      });
+    });
+
     searchBox.addEventListener("input", function () {
       const term = normalize(this.value);
       suggestionsDiv.innerHTML = "";
+      selectedSite = null;
 
       if (term.length < 2) {
         updateResult();
@@ -227,53 +301,61 @@
       filtered.forEach(item => {
         const div = document.createElement("div");
         div.classList.add("suggestion-item");
-        div.textContent = `${item.siteName} | ${item.elevator} | ${item.address}`;
+        div.textContent = `${item.siteName} | ${item.elevator} | ${shortenAddress(item.address)}`;
         div.addEventListener("click", () => {
           selectSite(item);
           suggestionsDiv.innerHTML = "";
         });
         suggestionsDiv.appendChild(div);
       });
+
+      updateResult();
     });
 
-    // ✅ 자동완성에서 현장 선택 시
     function selectSite(item) {
       selectedSite = item;
       searchBox.value = item.siteName;
       updateResult();
     }
 
-    // ✅ 메모/전화 입력 시 결과 갱신
     memoBox.addEventListener("input", updateResult);
     phoneBox.addEventListener("input", updateResult);
 
-    // ✅ 최종 결과 생성
     function updateResult() {
       if (!selectedSite) {
         resultBox.textContent = "현장을 선택하세요.";
+        resultBox.classList.remove("loading");
         return;
       }
 
-      let zoneLabel = selectedSite.zone.replace("팀", "").trim();
-      zoneLabel = zoneLabel ? `[${zoneLabel}]` : "";
+      const selectedSignal = selectBox.querySelector('input[name="signal"]:checked');
+      const signalText = selectedSignal ? `[${selectedSignal.value}] ` : "";
 
-      const baseInfo = [
-        selectedSite.siteName,
-        selectedSite.elevator,
-        selectedSite.extra
-      ].filter(x => x).join(" ");
+      const siteName = selectedSite.siteName;
+      const elevator = selectedSite.elevator;
+      const modelInfo = selectedSite.extra ? selectedSite.extra : "";
 
-      const addrInfo = selectedSite.address ? selectedSite.address + " /" : "";
-      const memo = memoBox.value.trim();
       const phone = phoneBox.value.trim();
-      const extraInfo = [memo, phone].filter(x => x).join(" ");
+      const memo = memoBox.value.trim();
 
-      let resultLine = `${baseInfo} / ${addrInfo} ${extraInfo} ${zoneLabel}`.trim();
-      resultLine = resultLine.replace(/\s+\/\s+\//g, " / ");
-      resultBox.textContent = resultLine;
+      const addrInfo = shortenAddress(selectedSite.address);
+
+      // 첫 줄: 신호 + 현장명 + 승강기번호
+      const firstLine = `${signalText}${siteName} ${elevator}`;
+
+      // 포맷팅: 메모 앞에 줄바꿈 한 줄 더, 나머지는 줄바꿈
+      // modelInfo 맨 뒤에 이어 붙임
+      let formatted = `${firstLine}
+${phone ? phone : ""}
+${addrInfo}
+
+${memo ? memo : ""}
+${modelInfo ? modelInfo : ""}`.trim();
+
+      resultBox.textContent = formatted;
+      resultBox.classList.remove("loading");
     }
 
-    // ✅ 복사 기능
     function copyResult() {
       const text = resultBox.textContent.trim();
       if (!text || text === "현장을 선택하세요." || text.includes("데이터를 불러오는 중")) {
@@ -285,6 +367,24 @@
       }).catch(() => {
         alert("복사에 실패했습니다. 직접 복사해주세요.");
       });
+    }
+
+    function resetAll() {
+      // 선택 박스 초기화
+      [...selectBox.querySelectorAll('input[type="radio"]')].forEach(radio => {
+        radio.checked = false;
+        radio.wasChecked = false;
+      });
+      // 입력란 초기화
+      searchBox.value = "";
+      memoBox.value = "";
+      phoneBox.value = "";
+      suggestionsDiv.innerHTML = "";
+      selectedSite = null;
+
+      resultBox.textContent = "현장명을 검색하세요.";
+      resultBox.classList.remove("loading");
+      searchBox.focus();
     }
   </script>
 </body>
