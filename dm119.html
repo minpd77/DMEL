@@ -196,7 +196,7 @@
     </div>
 
     <!-- 검색 -->
-    <input type="text" id="searchBox" placeholder="현장명·승강기번호·주소 일부 입력" autocomplete="off" />
+    <input type="text" id="searchBox" placeholder="현장명·승강기번호 일부 입력" autocomplete="off" />
     <div id="suggestions" class="suggestions"></div>
 
     <!-- 메모 입력 -->
@@ -285,7 +285,7 @@
       loadSiteData().then(data => {
         siteData = data;
         if (siteData.length > 0) {
-          resultBox.textContent = "현장명·승강기번호·주소를 검색하세요.";
+          resultBox.textContent = "현장명·승강기번호를 검색하세요.";
           resultBox.classList.remove("loading");
         } else {
           resultBox.textContent = "❌ 데이터를 불러올 수 없습니다.";
