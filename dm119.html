@@ -276,9 +276,19 @@
 
     // ✅ 주소 표시 구까지만
     function shortenAddress(addr) {
-      const match = addr.match(/.*?구/);
-      return match ? match[0] : addr;
-    }
+  if (!addr) return "";
+
+  // 1) "XX구" 형태 찾기 (예: 송파구, 영등포구, 구로구)
+  const guMatch = addr.match(/[가-힣]{1,6}구/);
+  if (guMatch) return guMatch[0];
+
+  // 2) 없으면 "XX시" 형태 찾기 (예: 성남시, 전주시, 원주시)
+  const siMatch = addr.match(/[가-힣]{1,6}시/);
+  if (siMatch) return siMatch[0];
+
+  // 3) 둘 다 없으면 원본 반환
+  return addr;
+}
 
     window.addEventListener("DOMContentLoaded", () => {
       resultBox.textContent = "데이터를 불러오는 중...";
@@ -348,38 +358,42 @@
     phoneBox.addEventListener("input", updateResult);
 
     function updateResult() {
-      if (!selectedSite) {
-        resultBox.textContent = "현장을 선택하세요.";
-        resultBox.classList.remove("loading");
-        return;
-      }
+  if (!selectedSite) {
+    resultBox.textContent = "현장을 선택하세요.";
+    resultBox.classList.remove("loading");
+    return;
+  }
 
-      const selectedSignal = selectBox.querySelector(
-        'input[name="signal"]:checked'
-      );
-      const signalText = selectedSignal ? `[${selectedSignal.value}] ` : "";
+  const selectedSignal = selectBox.querySelector(
+    'input[name="signal"]:checked'
+  );
+  const signalText = selectedSignal ? `[${selectedSignal.value}] ` : "";
 
-      const siteName = selectedSite.siteName;
-      const elevator = selectedSite.elevator.replace("-", ""); // ✅ 하이픈 제거 출력
-      const modelInfo = selectedSite.extra ? selectedSite.extra : "";
+  const siteName = selectedSite.siteName;
+  const elevator = selectedSite.elevator.replace("-", "");
+  const modelInfo = selectedSite.extra ? selectedSite.extra : "";
 
-      const phone = phoneBox.value.trim();
-      const memo = memoBox.value.trim();
+  const phone = phoneBox.value.trim();
+  const memo = memoBox.value.trim();
+  const addrInfo = shortenAddress(selectedSite.address);
 
-      const addrInfo = shortenAddress(selectedSite.address);
+  const firstLine = `${signalText}${siteName} ${elevator}`;
 
-      const firstLine = `${signalText}${siteName} ${elevator}`;
+  // ✅ 연락처가 있으면 한 줄 추가, 없으면 바로 주소
+  const phoneLine = phone ? `\n${phone}` : "";
 
-      let formatted = `${firstLine}
-${phone ? phone : ""}
-${addrInfo}
+  // ✅ 신고내용은 무조건 한 줄 띄우고 시작
+  const memoLine = memo ? `\n\n${memo}` : "";
 
-${memo ? memo : ""}
-${modelInfo ? modelInfo : ""}`.trim();
+  // ✅ 모델정보는 신고내용 아래에 바로 추가
+  const modelLine = modelInfo ? `\n${modelInfo}` : "";
 
-      resultBox.textContent = formatted;
-      resultBox.classList.remove("loading");
-    }
+  const formatted = `${firstLine}${phoneLine}
+${addrInfo}${memoLine}${modelLine}`.trim();
+
+  resultBox.textContent = formatted;
+  resultBox.classList.remove("loading");
+}
 
     function copyResult() {
       const text = resultBox.textContent.trim();
