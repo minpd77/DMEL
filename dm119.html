@@ -249,6 +249,7 @@
         siteName: (r[0] || "").trim(),
         zone: (r[1] || "").trim(),
         address: (r[2] || "").trim(),
+        jibunAddress: (r[10] || "").trim(),  // K열 지번 주소 (11번째 열, 인덱스 10)
         elevator: normalizeElevatorNumber(r[3] || ""),
         extra: (r[6] || "").trim(),
       }));
@@ -261,10 +262,45 @@
       return padded.slice(0, 4) + "-" + padded.slice(4);
     }
 
+    // 소문자화 + 띄어쓰기, 하이픈 제거
     function normalize(str) {
-      return str.toLowerCase().replace(/[\s-]+/g, "");
+      return (str || "").toLowerCase().replace(/[\s-]+/g, "");
     }
 
+    // 시/도명 제거 함수
+    function removeProvince(addr) {
+      if (!addr) return "";
+      const provinces = [
+        "서울특별시", "서울시", "경기도", "인천광역시", "부산광역시",
+        "대구광역시", "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
+        "강원도", "충청북도", "충청남도", "전라북도", "전라남도",
+        "경상북도", "경상남도", "제주특별자치도"
+      ];
+      let normalizedAddr = addr;
+      for (const prov of provinces) {
+        if (normalizedAddr.startsWith(prov)) {
+          normalizedAddr = normalizedAddr.slice(prov.length);
+          break;
+        }
+      }
+      return normalizedAddr;
+    }
+
+    // 검색어도 시/도명 제거 후 normalize
+    function normalizeSearchTerm(term) {
+      if (!term) return "";
+      const noProvince = removeProvince(term);
+      return normalize(noProvince);
+    }
+
+    // 주소도 시/도명 제거 후 normalize
+    function normalizeAddress(addr) {
+      if (!addr) return "";
+      const noProvince = removeProvince(addr);
+      return normalize(noProvince);
+    }
+
+    // 주소 줄임 (구/시 단위만)
     function shortenAddress(addr) {
       if (!addr) return "";
       const guMatch = addr.match(/[가-힣]{1,6}구/);
@@ -297,7 +333,9 @@
     });
 
     searchBox.addEventListener("input", function () {
-      const term = normalize(this.value);
+      const rawTerm = this.value;
+      const term = normalizeSearchTerm(rawTerm);
+
       suggestionsDiv.innerHTML = "";
       selectedSite = null;
 
@@ -306,17 +344,16 @@
         return;
       }
 
-      const filtered = siteData
-        .filter((item) => {
-          return (
-            normalize(item.siteName).includes(term) ||
-            normalize(item.address).includes(term) ||
-            normalize(item.elevator).includes(term)
-          );
-        })
-        .slice(0, 20);
+      const filtered = siteData.filter(item => {
+        return (
+          normalize(item.siteName).includes(term) ||
+          normalizeAddress(item.address).includes(term) ||
+          normalizeAddress(item.jibunAddress).includes(term) ||  // K열 지번 주소 검색 포함
+          normalize(item.elevator).includes(term)
+        );
+      }).slice(0, 20);
 
-      filtered.forEach((item) => {
+      filtered.forEach(item => {
         const div = document.createElement("div");
         div.classList.add("suggestion-item");
         div.textContent = `${item.siteName} | ${item.elevator} | ${shortenAddress(item.address)}`;
