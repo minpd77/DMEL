@@ -43,7 +43,6 @@
       font-weight: 600;
       color: #4caf50;
       transition: background-color 0.2s, color 0.2s;
-      user-select: none;
     }
     .select-box input[type="radio"] {
       display: none;
@@ -61,12 +60,6 @@
       border-radius: 8px;
       box-sizing: border-box;
       font-weight: 500;
-      transition: border-color 0.2s ease-in-out;
-    }
-    #searchBox:focus, #memoBox:focus, #phoneBox:focus {
-      outline: none;
-      border-color: #4caf50;
-      box-shadow: 0 0 5px #4caf50aa;
     }
     textarea {
       resize: none;
@@ -79,21 +72,13 @@
       overflow-y: auto;
       margin-bottom: 10px;
       background: #fff;
-      box-sizing: border-box;
       box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
       font-size: 15px;
-      user-select: none;
-      z-index: 1000;
-      position: relative;
     }
     .suggestion-item {
       padding: 10px 14px;
       cursor: pointer;
       border-bottom: 1px solid #eee;
-      transition: background-color 0.15s ease;
-    }
-    .suggestion-item:last-child {
-      border-bottom: none;
     }
     .suggestion-item:hover {
       background-color: #e6f7ff;
@@ -104,18 +89,23 @@
       background: #f5f5f5;
       border: 2px solid #4caf50;
       border-radius: 8px;
-      min-height: 50px;
       font-weight: 600;
       white-space: pre-wrap;
       font-size: 1rem;
-      max-height: none;
-      overflow: visible;
-      height: auto;
-      color: #333;
     }
     #resultBox.loading {
       color: #d32f2f;
       font-weight: 900;
+    }
+    #fullAddressBox {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1.5px dashed #ccc;
+      background-color: #fdfdfd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: #444;
+      white-space: pre-wrap;
     }
     .btn-group {
       display: flex;
@@ -132,49 +122,21 @@
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
-      transition: background-color 0.2s ease;
-      user-select: none;
-      position: relative;
-    }
-    button:active {
-      background: #45a049;
     }
     button.refresh {
       background: #888;
-    }
-    button.refresh:active {
-      background: #555;
     }
     #copyNotice {
       margin-top: 8px;
       color: #4caf50;
       font-weight: 700;
       font-size: 0.95rem;
-      min-height: 20px;
-      user-select: none;
       text-align: center;
       opacity: 0;
       transition: opacity 0.3s ease;
     }
     #copyNotice.visible {
       opacity: 1;
-    }
-    @media (max-width: 480px) {
-      h2 {
-        font-size: 1.3rem;
-      }
-      #searchBox, #memoBox, #phoneBox {
-        font-size: 15px;
-        padding: 10px 12px;
-      }
-      .suggestion-item {
-        font-size: 14px;
-        padding: 9px 12px;
-      }
-      .btn-group button {
-        font-size: 1.1rem;
-        padding: 13px;
-      }
     }
   </style>
 </head>
@@ -185,10 +147,8 @@
     <div class="select-box" id="selectBox">
       <input type="radio" name="signal" id="stop" value="정지" />
       <label for="stop">정지</label>
-
       <input type="radio" name="signal" id="complain" value="민원" />
       <label for="complain">민원</label>
-
       <input type="radio" name="signal" id="trapped" value="승객갇힘" />
       <label for="trapped">승객갇힘</label>
     </div>
@@ -197,7 +157,7 @@
     <div id="suggestions" class="suggestions"></div>
 
     <label for="memoBox">📌 신고내용</label>
-    <textarea id="memoBox" rows="2" placeholder="신고내용 기입"></textarea>
+    <textarea id="memoBox" placeholder="신고내용 기입"></textarea>
 
     <label for="phoneBox">📞 연락처</label>
     <input type="text" id="phoneBox" placeholder="신고자 연락처 기입" />
@@ -210,21 +170,115 @@
     </div>
 
     <div id="copyNotice"></div>
+    <div id="fullAddressBox"></div>
   </div>
 
   <script>
-    const SHEET_TSV_URL =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1374895459&single=true&output=tsv";
+    const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1374895459&single=true&output=tsv";
 
     let siteData = [];
     let selectedSite = null;
+
     const searchBox = document.getElementById("searchBox");
     const memoBox = document.getElementById("memoBox");
     const phoneBox = document.getElementById("phoneBox");
     const suggestionsDiv = document.getElementById("suggestions");
     const resultBox = document.getElementById("resultBox");
+    const fullAddressBox = document.getElementById("fullAddressBox");
     const selectBox = document.getElementById("selectBox");
     const copyNotice = document.getElementById("copyNotice");
+
+    async function loadSiteData() {
+      const response = await fetch(SHEET_TSV_URL);
+      const tsvText = await response.text();
+      const rows = tsvText.trim().split("\n").map((r) => r.split("\t"));
+      return rows.slice(1).map((r) => ({
+        siteName: (r[0] || "").trim(),
+        zone: (r[1] || "").trim(),
+        address: (r[2] || "").trim(),
+        jibunAddress: (r[10] || "").trim(),
+        elevator: normalizeElevatorNumber(r[3] || ""),
+        extra: (r[6] || "").trim(),
+      }));
+    }
+
+    function normalizeElevatorNumber(input) {
+      const digits = input.replace(/\D/g, "");
+      if (!digits) return "";
+      return digits.padStart(7, "0").replace(/^(\d{4})(\d{3})$/, "$1-$2");
+    }
+
+    function normalize(str) {
+      return (str || "").toLowerCase().replace(/[\s-]+/g, "");
+    }
+
+    function removeProvince(addr) {
+      const provinces = ["서울특별시", "서울시", "경기도", "인천광역시", "부산광역시",
+        "대구광역시", "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
+        "강원도", "충청북도", "충청남도", "전라북도", "전라남도",
+        "경상북도", "경상남도", "제주특별자치도"];
+      for (const prov of provinces) {
+        if (addr.startsWith(prov)) return addr.slice(prov.length);
+      }
+      return addr;
+    }
+
+    function normalizeSearchTerm(term) {
+      return normalize(removeProvince(term));
+    }
+
+    function normalizeAddress(addr) {
+      return normalize(removeProvince(addr));
+    }
+
+    function shortenAddress(addr) {
+      const guMatch = addr.match(/[가-힣]{1,6}구/);
+      if (guMatch) return guMatch[0];
+      const siMatch = addr.match(/[가-힣]{1,6}시/);
+      if (siMatch) return siMatch[0];
+      return addr;
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      resultBox.textContent = "데이터를 불러오는 중...";
+      siteData = await loadSiteData();
+      resultBox.textContent = siteData.length ? "현장명·승강기번호·주소를 검색하세요." : "❌ 데이터를 불러올 수 없습니다.";
+      resultBox.classList.remove("loading");
+    });
+
+    searchBox.addEventListener("input", function () {
+      const term = normalizeSearchTerm(this.value);
+      suggestionsDiv.innerHTML = "";
+      selectedSite = null;
+
+      if (term.length < 2) {
+        updateResult();
+        return;
+      }
+
+      siteData.filter(item => 
+        normalize(item.siteName).includes(term) ||
+        normalizeAddress(item.address).includes(term) ||
+        normalizeAddress(item.jibunAddress).includes(term) ||
+        normalize(item.elevator).includes(term)
+      ).slice(0, 20).forEach(item => {
+        const div = document.createElement("div");
+        div.className = "suggestion-item";
+        div.textContent = `${item.siteName} | ${item.elevator} | ${shortenAddress(item.address)}`;
+        div.onclick = () => {
+          selectedSite = item;
+          searchBox.value = item.siteName;
+          suggestionsDiv.innerHTML = "";
+          updateResult();
+        };
+        suggestionsDiv.appendChild(div);
+      });
+
+      updateResult();
+    });
+
+    memoBox.addEventListener("input", updateResult);
+    phoneBox.addEventListener("input", updateResult);
 
     selectBox.addEventListener("click", (e) => {
       if (e.target.tagName === "INPUT" && e.target.type === "radio") {
@@ -241,145 +295,10 @@
       }
     });
 
-    async function loadSiteData() {
-      const response = await fetch(SHEET_TSV_URL);
-      const tsvText = await response.text();
-      const rows = tsvText.trim().split("\n").map((r) => r.split("\t"));
-      return rows.slice(1).map((r) => ({
-        siteName: (r[0] || "").trim(),
-        zone: (r[1] || "").trim(),
-        address: (r[2] || "").trim(),
-        jibunAddress: (r[10] || "").trim(),  // K열 지번 주소 (11번째 열, 인덱스 10)
-        elevator: normalizeElevatorNumber(r[3] || ""),
-        extra: (r[6] || "").trim(),
-      }));
-    }
-
-    function normalizeElevatorNumber(input) {
-      const digits = (input || "").replace(/\D/g, "");
-      if (!digits) return "";
-      const padded = digits.padStart(7, "0");
-      return padded.slice(0, 4) + "-" + padded.slice(4);
-    }
-
-    // 소문자화 + 띄어쓰기, 하이픈 제거
-    function normalize(str) {
-      return (str || "").toLowerCase().replace(/[\s-]+/g, "");
-    }
-
-    // 시/도명 제거 함수
-    function removeProvince(addr) {
-      if (!addr) return "";
-      const provinces = [
-        "서울특별시", "서울시", "경기도", "인천광역시", "부산광역시",
-        "대구광역시", "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
-        "강원도", "충청북도", "충청남도", "전라북도", "전라남도",
-        "경상북도", "경상남도", "제주특별자치도"
-      ];
-      let normalizedAddr = addr;
-      for (const prov of provinces) {
-        if (normalizedAddr.startsWith(prov)) {
-          normalizedAddr = normalizedAddr.slice(prov.length);
-          break;
-        }
-      }
-      return normalizedAddr;
-    }
-
-    // 검색어도 시/도명 제거 후 normalize
-    function normalizeSearchTerm(term) {
-      if (!term) return "";
-      const noProvince = removeProvince(term);
-      return normalize(noProvince);
-    }
-
-    // 주소도 시/도명 제거 후 normalize
-    function normalizeAddress(addr) {
-      if (!addr) return "";
-      const noProvince = removeProvince(addr);
-      return normalize(noProvince);
-    }
-
-    // 주소 줄임 (구/시 단위만)
-    function shortenAddress(addr) {
-      if (!addr) return "";
-      const guMatch = addr.match(/[가-힣]{1,6}구/);
-      if (guMatch) return guMatch[0];
-      const siMatch = addr.match(/[가-힣]{1,6}시/);
-      if (siMatch) return siMatch[0];
-      return addr;
-    }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      resultBox.textContent = "데이터를 불러오는 중...";
-      resultBox.classList.add("loading");
-
-      loadSiteData()
-        .then((data) => {
-          siteData = data;
-          if (siteData.length > 0) {
-            resultBox.textContent = "현장명·승강기번호·주소를 검색하세요.";
-            resultBox.classList.remove("loading");
-          } else {
-            resultBox.textContent = "❌ 데이터를 불러올 수 없습니다.";
-            resultBox.classList.remove("loading");
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-          resultBox.textContent = "⚠️ 데이터 로드 실패";
-          resultBox.classList.remove("loading");
-        });
-    });
-
-    searchBox.addEventListener("input", function () {
-      const rawTerm = this.value;
-      const term = normalizeSearchTerm(rawTerm);
-
-      suggestionsDiv.innerHTML = "";
-      selectedSite = null;
-
-      if (term.length < 2) {
-        updateResult();
-        return;
-      }
-
-      const filtered = siteData.filter(item => {
-        return (
-          normalize(item.siteName).includes(term) ||
-          normalizeAddress(item.address).includes(term) ||
-          normalizeAddress(item.jibunAddress).includes(term) ||  // K열 지번 주소 검색 포함
-          normalize(item.elevator).includes(term)
-        );
-      }).slice(0, 20);
-
-      filtered.forEach(item => {
-        const div = document.createElement("div");
-        div.classList.add("suggestion-item");
-        div.textContent = `${item.siteName} | ${item.elevator} | ${shortenAddress(item.address)}`;
-        div.addEventListener("click", () => {
-          selectSite(item);
-          suggestionsDiv.innerHTML = "";
-        });
-        suggestionsDiv.appendChild(div);
-      });
-
-      updateResult();
-    });
-
-    function selectSite(item) {
-      selectedSite = item;
-      searchBox.value = item.siteName;
-      updateResult();
-    }
-
-    memoBox.addEventListener("input", updateResult);
-    phoneBox.addEventListener("input", updateResult);
-
     function updateResult() {
       if (!selectedSite) {
         resultBox.textContent = "현장을 선택하세요.";
-        resultBox.classList.remove("loading");
+        fullAddressBox.textContent = "";
         return;
       }
 
@@ -388,66 +307,43 @@
 
       const siteName = selectedSite.siteName;
       const elevator = selectedSite.elevator.replace("-", "");
-      const modelInfo = selectedSite.extra ? selectedSite.extra : "";
-
+      const modelInfo = selectedSite.extra || "";
       const phone = phoneBox.value.trim();
       const memo = memoBox.value.trim();
       const addrInfo = shortenAddress(selectedSite.address);
 
-      const firstLine = `${signalText}${siteName} ${elevator}`;
-      const phoneLine = phone ? `\n${phone}` : "";
-      const memoLine = memo ? `\n\n${memo}` : "";
-      const modelLine = modelInfo ? `\n${modelInfo}` : "";
-
-      const formatted = `${firstLine}${phoneLine}\n${addrInfo}${memoLine}${modelLine}`.trim();
+      const formatted = `${signalText}${siteName} ${elevator}`
+        + (phone ? `\n${phone}` : "")
+        + `\n${addrInfo}`
+        + (memo ? `\n\n${memo}` : "")
+        + (modelInfo ? `\n${modelInfo}` : "");
 
       resultBox.textContent = formatted;
-      resultBox.classList.remove("loading");
+      fullAddressBox.textContent = `${selectedSite.address}\n${selectedSite.jibunAddress}`;
     }
 
     function copyResult() {
       const text = resultBox.textContent.trim();
-      if (!text || text === "현장을 선택하세요." || text.includes("데이터를 불러오는 중")) {
-        copyNotice.textContent = "";
-        return;
-      }
-      navigator.clipboard.writeText(text)
-        .then(() => {
-          copyNotice.textContent = "📋 복사 완료!";
-          copyNotice.classList.add("visible");
-          setTimeout(() => {
-            copyNotice.classList.remove("visible");
-          }, 2500);
-        })
-        .catch(() => {
-          copyNotice.textContent = "복사에 실패했습니다. 직접 복사해주세요.";
-          copyNotice.classList.add("visible");
-          setTimeout(() => {
-            copyNotice.classList.remove("visible");
-          }, 3000);
-        });
+      if (!text || text.includes("현장을 선택") || text.includes("데이터를 불러오는 중")) return;
+
+      navigator.clipboard.writeText(text).then(() => {
+        copyNotice.textContent = "📋 복사 완료!";
+        copyNotice.classList.add("visible");
+        setTimeout(() => copyNotice.classList.remove("visible"), 2500);
+      });
     }
 
     function resetAll(e) {
       if (e) e.preventDefault();
-
-      [...selectBox.querySelectorAll('input[type="radio"]')].forEach((radio) => {
-        radio.checked = false;
-        radio.wasChecked = false;
-      });
-
+      [...selectBox.querySelectorAll('input[type="radio"]')].forEach(r => { r.checked = false; r.wasChecked = false; });
       searchBox.value = "";
       memoBox.value = "";
       phoneBox.value = "";
       selectedSite = null;
       suggestionsDiv.innerHTML = "";
-
       copyNotice.textContent = "";
-      copyNotice.classList.remove("visible");
-
+      fullAddressBox.textContent = "";
       updateResult();
-
-      document.activeElement.blur();
     }
   </script>
 </body>
