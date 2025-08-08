@@ -97,7 +97,7 @@
       color: #d32f2f;
       font-weight: 900;
     }
-    #fullAddressBox {
+    #fullAddressWrapper {
       margin-top: 12px;
       padding: 12px 14px;
       border: 1.5px dashed #ccc;
@@ -106,6 +106,19 @@
       font-size: 0.95rem;
       color: #444;
       white-space: pre-wrap;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    #addressText {
+      flex: 1;
+    }
+    .naver-icon {
+      width: 32px; /* 기존 28px → 15% 확대 */
+      height: 32px;
+      cursor: pointer;
+      flex-shrink: 0;
     }
     .btn-group {
       display: flex;
@@ -164,13 +177,19 @@
 
     <div id="resultBox" class="loading">데이터를 불러오는 중...</div>
 
+    <div id="fullAddressWrapper">
+      <span id="addressText"></span>
+      <img id="naverIcon" class="naver-icon" 
+           src="https://www.darun.io/_next/image?url=https%3A%2F%2Fres.cloudinary.com%2Fdqddtkvmb%2Fimage%2Fupload%2Fv1715433300%2Fimages%2Flogos%2Fnavermap.png&w=256&q=75" 
+           alt="네이버지도" title="네이버 지도에서 열기" />
+    </div>
+
     <div class="btn-group">
       <button type="button" class="refresh" onclick="resetAll(event)">🔄 새로고침</button>
       <button type="button" onclick="copyResult()">📋 복사하기</button>
     </div>
 
     <div id="copyNotice"></div>
-    <div id="fullAddressBox"></div>
   </div>
 
   <script>
@@ -184,9 +203,10 @@
     const phoneBox = document.getElementById("phoneBox");
     const suggestionsDiv = document.getElementById("suggestions");
     const resultBox = document.getElementById("resultBox");
-    const fullAddressBox = document.getElementById("fullAddressBox");
+    const addressText = document.getElementById("addressText");
     const selectBox = document.getElementById("selectBox");
     const copyNotice = document.getElementById("copyNotice");
+    const naverIcon = document.getElementById("naverIcon");
 
     async function loadSiteData() {
       const response = await fetch(SHEET_TSV_URL);
@@ -298,7 +318,7 @@
     function updateResult() {
       if (!selectedSite) {
         resultBox.textContent = "현장을 선택하세요.";
-        fullAddressBox.textContent = "";
+        addressText.textContent = "";
         return;
       }
 
@@ -319,8 +339,23 @@
         + (modelInfo ? `\n${modelInfo}` : "");
 
       resultBox.textContent = formatted;
-      fullAddressBox.textContent = `${selectedSite.address}\n${selectedSite.jibunAddress}`;
+      addressText.textContent = `${selectedSite.address}\n${selectedSite.jibunAddress}`;
     }
+
+    naverIcon.addEventListener("click", () => {
+      if (!selectedSite) return;
+      const addr = encodeURIComponent(selectedSite.address);
+      const webUrl = `https://map.naver.com/v5/search/${addr}`;
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        const appUrl = `nmap://search?query=${addr}`;
+        window.location.href = appUrl;
+        setTimeout(() => { window.location.href = webUrl; }, 800);
+      } else {
+        window.open(webUrl, "_blank");
+      }
+    });
 
     function copyResult() {
       const text = resultBox.textContent.trim();
@@ -342,7 +377,7 @@
       selectedSite = null;
       suggestionsDiv.innerHTML = "";
       copyNotice.textContent = "";
-      fullAddressBox.textContent = "";
+      addressText.textContent = "";
       updateResult();
     }
   </script>
