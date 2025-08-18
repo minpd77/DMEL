@@ -114,10 +114,11 @@
   <div id="nameToggle" class="on" title="마커 아래 현장명 표시 토글">현장명</div>
   <button id="refreshBtn" title="데이터 새로고침" aria-live="polite">새로고침</button>
 
-  <!-- 필터 -->
+  <!-- 필터 (순서: 강남팀, 강북팀, 경기, 검사필요, 검사(정기정밀)) -->
   <div class="team-filter" aria-label="팀 필터">
     <label><input type="checkbox" value="강남팀" checked> 강남팀 <span id="cntGangnam"></span></label>
     <label><input type="checkbox" value="강북팀" checked> 강북팀 <span id="cntGangbuk"></span></label>
+    <label><input type="checkbox" value="경기" checked> 경기 <span id="cntGyeonggi"></span></label>
     <label><input type="checkbox" value="검사필요"> 검사필요 <span id="cntNeed"></span></label>
     <label><input type="checkbox" value="검사정기정밀"> 검사(정기정밀) <span id="cntCheck"></span></label>
   </div>
@@ -134,24 +135,30 @@
 
   // ==== COLORS & INDEX ====
   const colors = {
-    orange: "rgba(246,187,67,1)", gray: "rgba(153,153,153,0.7)",
-    gray75: "rgba(153,153,153,0.5)", green: "rgba(0,192,75,1)",
-    blue: "rgba(0,25,244,1)", red: "rgba(255,59,59,1)"
+    orange: "rgba(246,187,67,1)",
+    gray: "rgba(153,153,153,0.7)",
+    gray75: "rgba(153,153,153,0.5)",
+    green: "rgba(0,192,75,1)",
+    blue: "rgba(0,25,244,1)",
+    red: "rgba(255,59,59,1)",
+    // 경기 전용 색상
+    gyeonggi: "rgb(100, 52, 143)"
   };
   const idx = {
     coord:1, address:7, special:21, checkDate:11,
     wNum:23, contact:24, model:27, fan:28,
     biTongNum:26, expire:30, siteName:32,
-    team:19, biTongEquip:16
+    team:19,  // T열 (구역/팀 기입 칸)
+    biTongEquip:16
   };
 
   // ==== STATE ====
-  const markersMap = {}; // key=좌표 문자열 -> Marker
-  let markerData = [];   // 검색/토글 반영용
+  const markersMap = {};
+  let markerData = [];
   let currentLocationMarker=null, locationWatchId=null;
   let locationOnFlag=false, currentSpeed=0;
-  let showSiteNames = true; // 현장명 토글 상태
-  let refreshSeq = 0;       // 새로고침 시퀀스
+  let showSiteNames = true;
+  let refreshSeq = 0;
 
   // ==== LOCATION ====
   const locationBtn = document.getElementById("locationBtn"),
@@ -207,10 +214,11 @@
   teamFilterInputs.forEach(i => i.addEventListener("change", () => {
     fetchTSVandPlot(refreshSeq);
   }));
-  const cntGangnam = document.getElementById("cntGangnam"),
-        cntGangbuk = document.getElementById("cntGangbuk"),
-        cntNeed = document.getElementById("cntNeed"),
-        cntCheck = document.getElementById("cntCheck");
+  const cntGangnam   = document.getElementById("cntGangnam"),
+        cntGangbuk   = document.getElementById("cntGangbuk"),
+        cntGyeonggi  = document.getElementById("cntGyeonggi"),
+        cntNeed      = document.getElementById("cntNeed"),
+        cntCheck     = document.getElementById("cntCheck");
 
   // ==== 현장명 토글 ====
   const nameToggleEl = document.getElementById("nameToggle");
@@ -222,10 +230,10 @@
   nameToggleEl.addEventListener('click', () => {
     showSiteNames = !showSiteNames;
     renderNameToggle();
-    updateMarkerHighlighting(); // 색/검색 상태 유지하며 라벨만 반영
+    updateMarkerHighlighting();
   });
 
-  // ==== 새로고침 버튼(깜빡임은 완료 신호로만 종료) ====
+  // ==== 새로고침 버튼 ====
   const refreshBtn = document.getElementById("refreshBtn");
   refreshBtn.addEventListener("click", async () => {
     const mySeq = ++refreshSeq;
@@ -243,11 +251,10 @@
 
   // ===== MAIN FETCH & PLOT =====
   async function fetchTSVandPlot(seq) {
-    markerData = []; // ✅ 항상 전부 다시 채운다
+    markerData = [];
     const res = await fetch(tsvUrl, { cache: "no-store" });
     const tsvText = await res.text();
 
-    // rows 가져오기
     const rowsRaw = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
 
     // 날짜가 있는 행과 없는 행 분리
@@ -258,25 +265,34 @@
     });
     const rows = rowsWithDate.concat(rowsWithoutDate);
 
-    const checkedTeams = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
-    const filterGangnam = checkedTeams.includes("강남팀");
-    const filterGangbuk = checkedTeams.includes("강북팀");
-    const filterNeed    = checkedTeams.includes("검사필요");
-    const filterCheck   = checkedTeams.includes("검사정기정밀");
+    const checked = Array.from(document.querySelectorAll('.team-filter input:checked')).map(i => i.value);
+    const filterGangnam  = checked.includes("강남팀");
+    const filterGangbuk  = checked.includes("강북팀");
+    const filterGyeonggi = checked.includes("경기");
+    const filterNeed     = checked.includes("검사필요");
+    const filterCheck    = checked.includes("검사정기정밀");
     const searchTerm = (document.getElementById("searchInput").value || "").trim().toLowerCase();
 
-    let cntGN=0, cntGB=0, totalGN=0, totalGB=0, cntNeedNum=0, cntCheckNum=0;
+    let cntGN=0, cntGB=0, totalGN=0, totalGB=0, totalGG=0, cntNeedNum=0, cntCheckNum=0;
     const coordGroups = {};
     const newKeys = new Set();
 
     rows.forEach(row => {
-      if (!row[0] || row[0].trim() === "") return;
-      const team = row[idx.team] || "";
-      if (team.includes("해지")) return;
+      const tCell = (row[idx.team] || "").trim();       // T열 (구역/팀)
+      if (tCell.includes("해지")) return;
+
+      // ── 경기 판정 (T열 값에 '경기' 포함)
+      const isGyeonggi = tCell.includes("경기");
+
+      // ✅ A열이 비어도 '경기'면 통과, 그 외(비-경기)는 A열 비면 스킵
+      if (!isGyeonggi && (!row[0] || row[0].trim() === "")) return;
+
+      // ▶ 경기 필터 OFF면 '경기'는 항상 숨김(검색/다른 필터보다 우선)
+      if (!filterGyeonggi && isGyeonggi) return;
 
       const coordStr = row[idx.coord];
       if (!coordStr) return;
-      const [latS, lngS] = coordStr.split(",");
+      const [latS, lngS] = coordStr.split(",").map(s => s.trim()); // ← 공백 제거
       if (!lngS) return;
       const lat = parseFloat(latS), lng = parseFloat(lngS);
       if (isNaN(lat) || isNaN(lng)) return;
@@ -285,7 +301,18 @@
       const address  = row[idx.address]  || "";
       const contact  = row[idx.contact]  || "";
       const expire   = row[idx.expire]   || "";
-      const checkDate= row[8] || ""; // I열
+      const checkDate= row[8] || ""; // I열 (검사일)
+
+      // 경기 총계 집계(표시용)
+      if (isGyeonggi) totalGG++;
+
+      // 팀 총계/분자 집계(기존 로직 유지)
+      if (tCell.includes("강남팀")) totalGN++;
+      if (tCell.includes("강북팀")) totalGB++;
+
+      const hasDate = !!row[idx.checkDate] && isValidDate(row[idx.checkDate]);
+      if (tCell.includes("강남팀") && hasDate) cntGN++;
+      if (tCell.includes("강북팀") && hasDate) cntGB++;
 
       const dDay = calcDateDiffNumber(expire);
       const isNeed = dDay !== null && dDay >= 0 && dDay <= 60;
@@ -295,13 +322,6 @@
       const isCheckValid = checkD !== null && checkD >= 0;
       if (isCheckValid) cntCheckNum++;
 
-      if (team.includes("강남팀")) totalGN++;
-      if (team.includes("강북팀")) totalGB++;
-
-      const hasDate = !!row[idx.checkDate] && isValidDate(row[idx.checkDate]);
-      if (team.includes("강남팀") && hasDate) cntGN++;
-      if (team.includes("강북팀") && hasDate) cntGB++;
-
       let show=false, color="", labelText="", zIndex=500;
 
       const matchesSearch = () => {
@@ -310,6 +330,7 @@
       };
 
       if (searchTerm && matchesSearch()) {
+        // 검색 강조(주황) — 다만 위에서 경기 OFF면 이미 제외됨
         show=true; color=colors.orange; labelText=""; zIndex=1000;
       } else if (filterNeed) {
         show=true;
@@ -319,10 +340,24 @@
         show=true;
         if (isCheckValid) { color=colors.red; labelText=`${checkD}`; zIndex=1000; }
         else { color=colors.gray75; zIndex=10; }
-      } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
-        show=true;
-        if (hasDate && row[idx.checkDate] !== expire) { color=colors.gray; zIndex=10; }
-        else { color=team.includes("강남팀") ? colors.green : colors.blue; zIndex=1000; }
+      } else {
+        // 팀/구역 필터 우선순위: 강남 → 강북 → 경기
+        let layer = null;
+        if (filterGangnam && tCell.includes("강남팀")) layer = "gangnam";
+        else if (filterGangbuk && tCell.includes("강북팀")) layer = "gangbuk";
+        else if (filterGyeonggi && isGyeonggi)       layer = "gyeonggi";
+
+        if (layer) {
+          show = true;
+          if (hasDate && row[idx.checkDate] !== expire) {
+            color = colors.gray; zIndex = 10;
+          } else {
+            color = (layer === "gangnam") ? colors.green
+                 : (layer === "gangbuk") ? colors.blue
+                 : /* layer === "gyeonggi" */ colors.gyeonggi;
+            zIndex = 1000;
+          }
+        }
       }
 
       if (!show) return;
@@ -334,12 +369,13 @@
     });
 
     // 카운터 반영
-    cntGangnam.textContent = ` (${cntGN}/${totalGN || 1})`;
-    cntGangbuk.textContent = ` (${cntGB}/${totalGB || 1})`;
-    cntNeed.textContent    = ` (${cntNeedNum})`;
-    cntCheck.textContent   = ` (${cntCheckNum})`;
+    cntGangnam.textContent  = ` (${cntGN}/${totalGN || 1})`;
+    cntGangbuk.textContent  = ` (${cntGB}/${totalGB || 1})`;
+    cntGyeonggi.textContent = ` (${totalGG})`;          // 경기 = 총 개수만
+    cntNeed.textContent     = ` (${cntNeedNum})`;
+    cntCheck.textContent    = ` (${cntCheckNum})`;
 
-    // 마커 생성/갱신 + ✅ markerData를 항상 채운다
+    // 마커 생성/갱신
     Object.entries(coordGroups).forEach(([key, group]) => {
       const { lat, lng, entries, color, labelText, zIndex } = group;
       const siteName = entries[0][idx.siteName] || "";
@@ -360,13 +396,12 @@
         </div>`;
       const icon = L.divIcon({ html: iconHtml, iconSize:[18,18], iconAnchor:[9,9], popupAnchor:[0,-9], className:"" });
 
-      // 팝업 HTML은 기존/신규 동일하게 재생성
       const popupHtml = entries.map(row => {
         const sn = row[idx.siteName] || "",
               addr = row[idx.address] || "",
               sp = row[idx.special] || "",
               cd = row[idx.checkDate] || "",
-              checkDateReal = row[8] || "", // 검사일 (I열)
+              checkDateReal = row[8] || "",
               wr = row[idx.wNum] || "",
               ct = row[idx.contact] || "",
               md = row[idx.model] || "",
@@ -406,7 +441,6 @@
         markersMap[key] = marker;
       }
 
-      // ✅ 신규/기존 모두 markerData에 등록(토글/검색이 전부 반영되도록)
       const markerRef = markersMap[key];
       markerData.push({
         marker: markerRef,
@@ -509,7 +543,7 @@
     });
   }
 
-  // 초기 로딩(첫 로딩은 깜빡임 없이)
+  // 초기 로딩
   fetchTSVandPlot(0);
   </script>
 </body>
