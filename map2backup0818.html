@@ -52,7 +52,7 @@
     width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; border:2px solid #fff;
   }
 
-  /* ✅ 새로고침 버튼: 기본 회색 / 로딩 시 빨간색 깜빡임 */
+  /* 새로고침 버튼: 기본 회색 / 로딩 시 빨간색 깜빡임 */
   #refreshBtn {
     position: fixed; bottom: 60px; right: 10px; z-index: 2000; font-size: 19px;
     background: #d9d9d9; color: #333; font-weight: bold; padding: 6px 15px; border-radius: 10px;
@@ -110,11 +110,11 @@
     <div class="circle-dot" id="locCircle"></div> 내 위치
   </div>
 
-  <!-- ✅ 새 UI: 현장명 토글 + 새로고침 -->
+  <!-- 새 UI: 현장명 토글 + 새로고침 -->
   <div id="nameToggle" class="on" title="마커 아래 현장명 표시 토글">현장명</div>
   <button id="refreshBtn" title="데이터 새로고침" aria-live="polite">새로고침</button>
 
-  <!-- ✅ 필터 -->
+  <!-- 필터 -->
   <div class="team-filter" aria-label="팀 필터">
     <label><input type="checkbox" value="강남팀" checked> 강남팀 <span id="cntGangnam"></span></label>
     <label><input type="checkbox" value="강북팀" checked> 강북팀 <span id="cntGangbuk"></span></label>
@@ -150,7 +150,8 @@
   let markerData = [];   // 검색/토글 반영용
   let currentLocationMarker=null, locationWatchId=null;
   let locationOnFlag=false, currentSpeed=0;
-  let showSiteNames = true; // ✅ 현장명 토글 상태
+  let showSiteNames = true; // 현장명 토글 상태
+  let refreshSeq = 0;       // 새로고침 시퀀스
 
   // ==== LOCATION ====
   const locationBtn = document.getElementById("locationBtn"),
@@ -203,45 +204,46 @@
 
   // ==== FILTER ====
   const teamFilterInputs = document.querySelectorAll(".team-filter input");
-  teamFilterInputs.forEach(i => i.addEventListener("change", fetchTSVandPlot));
+  teamFilterInputs.forEach(i => i.addEventListener("change", () => {
+    fetchTSVandPlot(refreshSeq);
+  }));
   const cntGangnam = document.getElementById("cntGangnam"),
         cntGangbuk = document.getElementById("cntGangbuk"),
         cntNeed = document.getElementById("cntNeed"),
         cntCheck = document.getElementById("cntCheck");
 
-  // ==== 새 UI: 현장명 토글 ====
+  // ==== 현장명 토글 ====
   const nameToggleEl = document.getElementById("nameToggle");
   function renderNameToggle(){
     nameToggleEl.classList.toggle('on',  showSiteNames);
     nameToggleEl.classList.toggle('off', !showSiteNames);
   }
   renderNameToggle();
-
   nameToggleEl.addEventListener('click', () => {
     showSiteNames = !showSiteNames;
     renderNameToggle();
-    updateMarkerHighlighting(); // 현재 색/검색 상태 유지하며 라벨만 반영
+    updateMarkerHighlighting(); // 색/검색 상태 유지하며 라벨만 반영
   });
 
-  // ==== 새로고침 버튼: 로딩 중 깜빡임 처리 ====
+  // ==== 새로고침 버튼(깜빡임은 완료 신호로만 종료) ====
   const refreshBtn = document.getElementById("refreshBtn");
   refreshBtn.addEventListener("click", async () => {
-    if (refreshBtn.disabled) return;           // 중복 클릭 방지
-    refreshBtn.disabled = true;                // 비활성화
-    refreshBtn.classList.add("loading");       // 빨간색 깜빡임 시작
-    refreshBtn.setAttribute("aria-busy", "true");
+    const mySeq = ++refreshSeq;
+    startBlink();
     try {
-      await fetchTSVandPlot();                 // 데이터 재로딩
-    } finally {
-      refreshBtn.classList.remove("loading");  // 깜빡임 종료
-      refreshBtn.removeAttribute("aria-busy");
-      refreshBtn.disabled = false;             // 재활성화 (회색 복귀)
+      const result = await fetchTSVandPlot(mySeq);
+      if (result && result.seq === mySeq && result.done) stopBlink();
+    } catch (e) {
+      stopBlink();
+      console.error(e);
     }
   });
+  function startBlink(){ refreshBtn.disabled=true; refreshBtn.classList.add("loading"); refreshBtn.setAttribute("aria-busy","true"); }
+  function stopBlink(){ refreshBtn.classList.remove("loading"); refreshBtn.removeAttribute("aria-busy"); refreshBtn.disabled=false; }
 
   // ===== MAIN FETCH & PLOT =====
-  async function fetchTSVandPlot() {
-    markerData = []; // 이전 데이터 초기화
+  async function fetchTSVandPlot(seq) {
+    markerData = []; // ✅ 항상 전부 다시 채운다
     const res = await fetch(tsvUrl, { cache: "no-store" });
     const tsvText = await res.text();
 
@@ -249,12 +251,10 @@
     const rowsRaw = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
 
     // 날짜가 있는 행과 없는 행 분리
-    const rowsWithDate = [];
-    const rowsWithoutDate = [];
+    const rowsWithDate = [], rowsWithoutDate = [];
     rowsRaw.forEach(row => {
       const date = row[0]?.trim();
-      if (date) rowsWithDate.push(row);
-      else rowsWithoutDate.push(row);
+      if (date) rowsWithDate.push(row); else rowsWithoutDate.push(row);
     });
     const rows = rowsWithDate.concat(rowsWithoutDate);
 
@@ -263,15 +263,14 @@
     const filterGangbuk = checkedTeams.includes("강북팀");
     const filterNeed    = checkedTeams.includes("검사필요");
     const filterCheck   = checkedTeams.includes("검사정기정밀");
-    const searchTerm = searchInput.value.trim().toLowerCase();
+    const searchTerm = (document.getElementById("searchInput").value || "").trim().toLowerCase();
 
-    let cntGN = 0, cntGB = 0, totalGN = 0, totalGB = 0, cntNeedNum = 0, cntCheckNum = 0;
+    let cntGN=0, cntGB=0, totalGN=0, totalGB=0, cntNeedNum=0, cntCheckNum=0;
     const coordGroups = {};
     const newKeys = new Set();
 
     rows.forEach(row => {
-      if (!row[0] || row[0].trim() === "") return; // 현장명 없으면 제외
-
+      if (!row[0] || row[0].trim() === "") return;
       const team = row[idx.team] || "";
       if (team.includes("해지")) return;
 
@@ -283,10 +282,10 @@
       if (isNaN(lat) || isNaN(lng)) return;
 
       const siteName = row[idx.siteName] || "";
-      const address = row[idx.address] || "";
-      const contact = row[idx.contact] || "";
-      const expire = row[idx.expire] || "";
-      const checkDate = row[8] || ""; // I열
+      const address  = row[idx.address]  || "";
+      const contact  = row[idx.contact]  || "";
+      const expire   = row[idx.expire]   || "";
+      const checkDate= row[8] || ""; // I열
 
       const dDay = calcDateDiffNumber(expire);
       const isNeed = dDay !== null && dDay >= 0 && dDay <= 60;
@@ -303,7 +302,7 @@
       if (team.includes("강남팀") && hasDate) cntGN++;
       if (team.includes("강북팀") && hasDate) cntGB++;
 
-      let show = false, color = "", labelText = "", zIndex = 500;
+      let show=false, color="", labelText="", zIndex=500;
 
       const matchesSearch = () => {
         const combined = `${siteName} ${address} ${contact}`.toLowerCase();
@@ -311,19 +310,19 @@
       };
 
       if (searchTerm && matchesSearch()) {
-        show = true; color = colors.orange; labelText = ""; zIndex = 1000;
+        show=true; color=colors.orange; labelText=""; zIndex=1000;
       } else if (filterNeed) {
-        show = true;
-        if (isNeed) { color = colors.red; labelText = `${Math.abs(dDay)}`; zIndex = 1000; }
-        else { color = colors.gray75; zIndex = 10; }
+        show=true;
+        if (isNeed) { color=colors.red; labelText=`${Math.abs(dDay)}`; zIndex=1000; }
+        else { color=colors.gray75; zIndex=10; }
       } else if (filterCheck) {
-        show = true;
-        if (isCheckValid) { color = colors.red; labelText = `${checkD}`; zIndex = 1000; }
-        else { color = colors.gray75; zIndex = 10; }
+        show=true;
+        if (isCheckValid) { color=colors.red; labelText=`${checkD}`; zIndex=1000; }
+        else { color=colors.gray75; zIndex=10; }
       } else if ((filterGangnam && team.includes("강남팀")) || (filterGangbuk && team.includes("강북팀"))) {
-        show = true;
-        if (hasDate && row[idx.checkDate] !== expire) { color = colors.gray; zIndex = 10; }
-        else { color = team.includes("강남팀") ? colors.green : colors.blue; zIndex = 1000; }
+        show=true;
+        if (hasDate && row[idx.checkDate] !== expire) { color=colors.gray; zIndex=10; }
+        else { color=team.includes("강남팀") ? colors.green : colors.blue; zIndex=1000; }
       }
 
       if (!show) return;
@@ -340,118 +339,108 @@
     cntNeed.textContent    = ` (${cntNeedNum})`;
     cntCheck.textContent   = ` (${cntCheckNum})`;
 
-    // 마커 생성/갱신
+    // 마커 생성/갱신 + ✅ markerData를 항상 채운다
     Object.entries(coordGroups).forEach(([key, group]) => {
       const { lat, lng, entries, color, labelText, zIndex } = group;
-      const siteName = entries[0][idx.siteName] || ""; // 첫 항목 현장명
+      const siteName = entries[0][idx.siteName] || "";
       let label = labelText;
       if (!label && entries.length > 1) label = `${entries.length}`;
 
-      // 라벨(숫자) HTML
-      const labelHtml = label
-        ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>`
-        : "";
-
-      // (토글) 현장명 HTML
+      const labelHtml = label ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>` : "";
       const markerNameHtml = showSiteNames ? `<div style="
           position:absolute; top:20px; left:50%; transform:translateX(-50%);
           font-size:11px; color:black; background:white;
           padding:2px 4px; border-radius:4px; white-space:nowrap;
           box-shadow:0 1px 3px rgba(0,0,0,0.2);
         ">${siteName}</div>` : "";
-
-      const html = `<div style="position:relative;width:18px;height:18px;">
+      const iconHtml = `<div style="position:relative;width:18px;height:18px;">
           <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
           ${labelHtml}
           ${markerNameHtml}
         </div>`;
+      const icon = L.divIcon({ html: iconHtml, iconSize:[18,18], iconAnchor:[9,9], popupAnchor:[0,-9], className:"" });
 
-      const icon = L.divIcon({ html, iconSize:[18,18], iconAnchor:[9,9], popupAnchor:[0,-9], className:"" });
+      // 팝업 HTML은 기존/신규 동일하게 재생성
+      const popupHtml = entries.map(row => {
+        const sn = row[idx.siteName] || "",
+              addr = row[idx.address] || "",
+              sp = row[idx.special] || "",
+              cd = row[idx.checkDate] || "",
+              checkDateReal = row[8] || "", // 검사일 (I열)
+              wr = row[idx.wNum] || "",
+              ct = row[idx.contact] || "",
+              md = row[idx.model] || "",
+              fn = row[idx.fan] || "",
+              bt = row[idx.biTongNum] || "",
+              eq = row[idx.biTongEquip] || "",
+              ex = row[idx.expire] || "";
+        const wp = wr.replace(/\D/g, '').padStart(7, "0");
+        const dm = calcDateDiff(ex);
+        const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
+        return `
+          <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
+          <a href="${nlink}" target="_blank">${addr}</a><br/>
+          📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
+          특이사항: ${sp}<br/>
+          점검: ${cd}<br/>
+          기종: ${md}<br/>
+          Fan: ${fn}<br/>
+          비통번호: ${bt}<br/>
+          비통장비: ${eq}<br/>
+          유효기간: ${ex} ${dm}<br/>
+          <strong style="color:red;">검사일: ${checkDateReal}</strong>
+          <hr/>`;
+      }).join("");
+      const wrappedPopup = `<div class="popup-scroll">${popupHtml}</div>`.replace(/<hr\/>\s*<\/div>$/, '</div>');
 
       const existing = markersMap[key];
       if (existing) {
-        const old = existing.__meta || {};
-        const changed = old.color !== color || old.labelText !== labelText || old.showSiteNames !== showSiteNames;
-        if (changed) {
-          existing.setIcon(icon);
-          existing.setZIndexOffset(zIndex);
-          existing.__meta = { color, labelText, showSiteNames };
-        }
+        existing.setIcon(icon);
+        existing.setZIndexOffset(zIndex);
+        existing.__meta = { color, labelText, showSiteNames };
+        existing.getPopup() ? existing.setPopupContent(wrappedPopup) : existing.bindPopup(wrappedPopup);
       } else {
         const marker = L.marker([lat, lng], { icon, zIndexOffset: zIndex }).addTo(map);
-
-        const popupHtml = entries.map(row => {
-          const sn = row[idx.siteName] || "",
-                addr = row[idx.address] || "",
-                sp = row[idx.special] || "",
-                cd = row[idx.checkDate] || "",
-                checkDateReal = row[8] || "", // 검사일 (I열)
-                wr = row[idx.wNum] || "",
-                ct = row[idx.contact] || "",
-                md = row[idx.model] || "",
-                fn = row[idx.fan] || "",
-                bt = row[idx.biTongNum] || "",
-                eq = row[idx.biTongEquip] || "",
-                ex = row[idx.expire] || "";
-
-          const wp = wr.replace(/\D/g, '').padStart(7, "0");
-          const dm = calcDateDiff(ex);
-          const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
-
-          return `
-            <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
-            <a href="${nlink}" target="_blank">${addr}</a><br/>
-            📞 <a href="tel:${ct.replace(/\D/g, '')}">${ct}</a><br/>
-            특이사항: ${sp}<br/>
-            점검: ${cd}<br/>
-            기종: ${md}<br/>
-            Fan: ${fn}<br/>
-            비통번호: ${bt}<br/>
-            비통장비: ${eq}<br/>
-            유효기간: ${ex} ${dm}<br/>
-            <strong style="color:red;">검사일: ${checkDateReal}</strong>
-            <hr/>`;
-        }).join("");
-
-        const wrappedPopup = `<div class="popup-scroll">${popupHtml}</div>`.replace(/<hr\/>\s*<\/div>$/, '</div>');
         marker.bindPopup(wrappedPopup);
         marker.__meta = { color, labelText, showSiteNames };
         markersMap[key] = marker;
-
-        // 검색/토글 적용용 데이터 보관
-        markerData.push({
-          marker,
-          popupHtmlOriginal: wrappedPopup,
-          baseColor: color,
-          labelText,
-          siteName,
-          createMarkerHtml: (c) => {
-            const labelHtml = (label ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>` : "");
-            const markerNameHtml = showSiteNames ? `<div style="
-                position:absolute; top:20px; left:50%; transform:translateX(-50%);
-                font-size:11px; color:black; background:white;
-                padding:2px 4px; border-radius:4px; white-space:nowrap;
-                box-shadow:0 1px 3px rgba(0,0,0,0.2);
-              ">${siteName}</div>` : "";
-            return `<div style="position:relative;width:18px;height:18px;">
-                <div style="background-color:${c};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
-                ${labelHtml}
-                ${markerNameHtml}
-              </div>`;
-          }
-        });
       }
+
+      // ✅ 신규/기존 모두 markerData에 등록(토글/검색이 전부 반영되도록)
+      const markerRef = markersMap[key];
+      markerData.push({
+        marker: markerRef,
+        popupHtmlOriginal: wrappedPopup,
+        baseColor: color,
+        labelText: label || "",
+        siteName,
+        createMarkerHtml: (c) => {
+          const labelHTML = (label ? `<div class="marker-label" style="font-size:12px; letter-spacing:-1px;">&nbsp;${label}</div>` : "");
+          const nameHTML = showSiteNames ? `<div style="
+              position:absolute; top:20px; left:50%; transform:translateX(-50%);
+              font-size:11px; color:black; background:white;
+              padding:2px 4px; border-radius:4px; white-space:nowrap;
+              box-shadow:0 1px 3px rgba(0,0,0,0.2);
+            ">${siteName}</div>` : "";
+          return `<div style="position:relative;width:18px;height:18px;">
+              <div style="background-color:${c};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
+              ${labelHTML}
+              ${nameHTML}
+            </div>`;
+        }
+      });
     });
 
     // 빠진 마커 제거
     Object.keys(markersMap).forEach(key => {
-      if (!new Set(Object.keys(coordGroups)).has(key)) {
+      if (!newKeys.has(key)) {
         map.removeLayer(markersMap[key]);
         delete markersMap[key];
       }
     });
 
     updateMarkerHighlighting();
+    return { seq, done:true, markerCount: markerData.length };
   }
 
   // ==== UTILITIES ====
@@ -478,14 +467,13 @@
   }
 
   function updateMarkerHighlighting() {
-    const termRaw = searchInput.value.trim().toLowerCase();
+    const termRaw = (document.getElementById("searchInput").value || "").trim().toLowerCase();
     const term = termRaw.replace(/[\s\-]/g, "");
 
     markerData.forEach(o => {
       let html = o.popupHtmlOriginal;
       let hit = false;
 
-      // 검색 대상 텍스트만 추출
       const searchTarget = o.popupHtmlOriginal
         .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')
         .replace(/<[^>]+>/g, '')
@@ -495,20 +483,14 @@
 
       if (term && searchTarget.includes(term)) {
         hit = true;
-
-        // 링크 백업
         const links = [];
         html = html.replace(/<a\b[^>]*>.*?<\/a>/gi, m => {
           links.push(m);
           return `@@LINK${links.length - 1}@@`;
         });
-
-        // 하이라이트
         const safeTerm = termRaw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(safeTerm, 'gi');
         html = html.replace(regex, '<span class="highlight-text">$&</span>');
-
-        // 링크 복원
         html = html.replace(/@@LINK(\d+)@@/g, (_, i) => links[parseInt(i)]);
       }
 
@@ -527,8 +509,8 @@
     });
   }
 
-  // 초기 로딩
-  fetchTSVandPlot();
+  // 초기 로딩(첫 로딩은 깜빡임 없이)
+  fetchTSVandPlot(0);
   </script>
 </body>
 </html>
