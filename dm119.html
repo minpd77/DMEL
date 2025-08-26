@@ -61,10 +61,7 @@
       box-sizing: border-box;
       font-weight: 500;
     }
-    textarea {
-      resize: none;
-      min-height: 60px;
-    }
+    textarea { resize: none; min-height: 60px; }
     .suggestions {
       border: 1px solid #ccc;
       border-radius: 8px;
@@ -80,9 +77,7 @@
       cursor: pointer;
       border-bottom: 1px solid #eee;
     }
-    .suggestion-item:hover {
-      background-color: #e6f7ff;
-    }
+    .suggestion-item:hover { background-color: #e6f7ff; }
     #resultBox {
       margin-top: 15px;
       padding: 15px;
@@ -93,10 +88,7 @@
       white-space: pre-wrap;
       font-size: 1rem;
     }
-    #resultBox.loading {
-      color: #d32f2f;
-      font-weight: 900;
-    }
+    #resultBox.loading { color: #d32f2f; font-weight: 900; }
     #fullAddressWrapper {
       margin-top: 12px;
       padding: 12px 14px;
@@ -111,46 +103,21 @@
       align-items: center;
       gap: 8px;
     }
-    #addressText {
-      flex: 1;
-    }
-    .naver-icon {
-      width: 32px; /* 기존 28px → 15% 확대 */
-      height: 32px;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-    .btn-group {
-      display: flex;
-      gap: 10px;
-      margin-top: 18px;
-    }
+    #addressText { flex: 1; }
+    .naver-icon { width: 32px; height: 32px; cursor: pointer; flex-shrink: 0; }
+    .btn-group { display: flex; gap: 10px; margin-top: 18px; }
     button {
       flex: 1;
       padding: 15px;
-      background: #4caf50;
-      color: white;
-      font-size: 1.2rem;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
+      background: #4caf50; color: white; font-size: 1.2rem;
+      border: none; border-radius: 8px; cursor: pointer; font-weight: 600;
     }
-    button.refresh {
-      background: #888;
-    }
+    button.refresh { background: #888; }
     #copyNotice {
-      margin-top: 8px;
-      color: #4caf50;
-      font-weight: 700;
-      font-size: 0.95rem;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.3s ease;
+      margin-top: 8px; color: #4caf50; font-weight: 700;
+      font-size: 0.95rem; text-align: center; opacity: 0; transition: opacity 0.3s ease;
     }
-    #copyNotice.visible {
-      opacity: 1;
-    }
+    #copyNotice.visible { opacity: 1; }
   </style>
 </head>
 <body>
@@ -193,79 +160,119 @@
   </div>
 
   <script>
-    const SHEET_TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1374895459&single=true&output=tsv";
+    // 🔗 깃허브 RAW TSV 주소 (민PD 제공)
+    const RAW_TSV_URL = "https://raw.githubusercontent.com/minpd77/DMEL/main/info.tsv";
 
     let siteData = [];
     let selectedSite = null;
 
-    const searchBox = document.getElementById("searchBox");
-    const memoBox = document.getElementById("memoBox");
-    const phoneBox = document.getElementById("phoneBox");
-    const suggestionsDiv = document.getElementById("suggestions");
-    const resultBox = document.getElementById("resultBox");
-    const addressText = document.getElementById("addressText");
-    const selectBox = document.getElementById("selectBox");
-    const copyNotice = document.getElementById("copyNotice");
-    const naverIcon = document.getElementById("naverIcon");
+    const $ = (id) => document.getElementById(id);
+    const searchBox = $("searchBox");
+    const memoBox = $("memoBox");
+    const phoneBox = $("phoneBox");
+    const suggestionsDiv = $("suggestions");
+    const resultBox = $("resultBox");
+    const addressText = $("addressText");
+    const selectBox = $("selectBox");
+    const copyNotice = $("copyNotice");
+    const naverIcon = $("naverIcon");
 
-    async function loadSiteData() {
-      const response = await fetch(SHEET_TSV_URL);
-      const tsvText = await response.text();
-      const rows = tsvText.trim().split("\n").map((r) => r.split("\t"));
-      return rows.slice(1).map((r) => ({
-        siteName: (r[0] || "").trim(),
-        zone: (r[1] || "").trim(),
-        address: (r[2] || "").trim(),
-        jibunAddress: (r[10] || "").trim(),
-        elevator: normalizeElevatorNumber(r[3] || ""),
-        extra: (r[6] || "").trim(),
-      }));
-    }
-
+    // ====== 유틸 ======
     function normalizeElevatorNumber(input) {
-      const digits = input.replace(/\D/g, "");
+      const digits = String(input || "").replace(/\D/g, "");
       if (!digits) return "";
       return digits.padStart(7, "0").replace(/^(\d{4})(\d{3})$/, "$1-$2");
     }
-
     function normalize(str) {
       return (str || "").toLowerCase().replace(/[\s-]+/g, "");
     }
-
     function removeProvince(addr) {
-      const provinces = ["서울특별시", "서울시", "경기도", "인천광역시", "부산광역시",
-        "대구광역시", "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
-        "강원도", "충청북도", "충청남도", "전라북도", "전라남도",
-        "경상북도", "경상남도", "제주특별자치도"];
+      const provinces = ["서울특별시","서울시","경기도","인천광역시","부산광역시","대구광역시","광주광역시","대전광역시","울산광역시","세종특별자치시","강원도","충청북도","충청남도","전라북도","전라남도","경상북도","경상남도","제주특별자치도"];
       for (const prov of provinces) {
-        if (addr.startsWith(prov)) return addr.slice(prov.length);
+        if ((addr||"").startsWith(prov)) return addr.slice(prov.length);
       }
-      return addr;
+      return addr||"";
     }
-
-    function normalizeSearchTerm(term) {
-      return normalize(removeProvince(term));
-    }
-
-    function normalizeAddress(addr) {
-      return normalize(removeProvince(addr));
-    }
-
+    function normalizeSearchTerm(term) { return normalize(removeProvince(term)); }
+    function normalizeAddress(addr) { return normalize(removeProvince(addr)); }
     function shortenAddress(addr) {
-      const guMatch = addr.match(/[가-힣]{1,6}구/);
+      const a = addr || "";
+      const guMatch = a.match(/[가-힣]{1,6}구/);
       if (guMatch) return guMatch[0];
-      const siMatch = addr.match(/[가-힣]{1,6}시/);
+      const siMatch = a.match(/[가-힣]{1,6}시/);
       if (siMatch) return siMatch[0];
-      return addr;
+      return a;
+    }
+    const normKey = (s) => String(s||"").toLowerCase().replace(/\s+/g,"").replace(/[._-]/g,"");
+
+    // ====== TSV 로딩 + 유연 매핑 ======
+    async function loadSiteData() {
+      const url = RAW_TSV_URL + (RAW_TSV_URL.includes("?") ? "&" : "?") + "_ts=" + Date.now();
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("TSV 다운로드 실패: HTTP " + res.status);
+      const text = await res.text();
+
+      const rows = text.trim().split(/\r?\n/).map(r => r.split("\t"));
+      if (!rows.length) return [];
+
+      // 헤더 가공
+      const rawHeader = rows[0].map(h => (h||"").trim());
+      const header = rawHeader.map(normKey);
+
+      // 후보: (왼쪽부터 우선)
+      const mapCandidates = {
+        siteName:     ["현장명","현장이름","sitename","site","name","장소"],
+        zone:         ["구역","팀","team","zone"],
+        address:      ["주소","도로명주소","address","roadaddress"],
+        jibunAddress: ["지번주소","지번","jibun","lotaddress"],
+        elevator:     ["승강기번호","고유번호","elevator","elevatorno","elvno","no_plaq","plaq","eleno","eleno"],
+        extra:        ["기종","특이사항","비고","모델","model","etc","추가정보","메모"]
+      };
+
+      // 실제 인덱스 해석
+      const indexOfAny = (cands) => {
+        for (const c of cands) {
+          const i = header.indexOf(c);
+          if (i !== -1) return i;
+        }
+        return -1;
+      };
+
+      const idx = {
+        siteName: indexOfAny(mapCandidates.siteName),
+        zone: indexOfAny(mapCandidates.zone),
+        address: indexOfAny(mapCandidates.address),
+        jibunAddress: indexOfAny(mapCandidates.jibunAddress),
+        elevator: indexOfAny(mapCandidates.elevator),
+        extra: indexOfAny(mapCandidates.extra)
+      };
+
+      // 데이터 변환
+      return rows.slice(1).map(r => ({
+        siteName: (idx.siteName>=0 ? (r[idx.siteName]||"").trim() : ""),
+        zone: (idx.zone>=0 ? (r[idx.zone]||"").trim() : ""),
+        address: (idx.address>=0 ? (r[idx.address]||"").trim() : ""),
+        jibunAddress: (idx.jibunAddress>=0 ? (r[idx.jibunAddress]||"").trim() : ""),
+        elevator: normalizeElevatorNumber(idx.elevator>=0 ? (r[idx.elevator]||"") : ""),
+        extra: (idx.extra>=0 ? (r[idx.extra]||"").trim() : "")
+      })).filter(x => x.siteName || x.address || x.elevator);
     }
 
+    // ====== 초기 로딩 ======
     window.addEventListener("DOMContentLoaded", async () => {
-      resultBox.textContent = "데이터를 불러오는 중...";
-      siteData = await loadSiteData();
-      resultBox.textContent = siteData.length ? "현장명·승강기번호·주소를 검색하세요." : "❌ 데이터를 불러올 수 없습니다.";
-      resultBox.classList.remove("loading");
+      try {
+        resultBox.textContent = "데이터를 불러오는 중...";
+        siteData = await loadSiteData();
+        resultBox.textContent = siteData.length ? "현장명·승강기번호·주소를 검색하세요." : "❌ 데이터를 불러올 수 없습니다.";
+      } catch (e) {
+        console.error(e);
+        resultBox.textContent = "❌ TSV 로딩 오류: " + String(e.message||e);
+      } finally {
+        resultBox.classList.remove("loading");
+      }
     });
 
+    // ====== 검색/자동완성 ======
     searchBox.addEventListener("input", function () {
       const term = normalizeSearchTerm(this.value);
       suggestionsDiv.innerHTML = "";
@@ -276,23 +283,26 @@
         return;
       }
 
-      siteData.filter(item => 
-        normalize(item.siteName).includes(term) ||
-        normalizeAddress(item.address).includes(term) ||
-        normalizeAddress(item.jibunAddress).includes(term) ||
-        normalize(item.elevator).includes(term)
-      ).slice(0, 20).forEach(item => {
-        const div = document.createElement("div");
-        div.className = "suggestion-item";
-        div.textContent = `${item.siteName} | ${item.elevator} | ${shortenAddress(item.address)}`;
-        div.onclick = () => {
-          selectedSite = item;
-          searchBox.value = item.siteName;
-          suggestionsDiv.innerHTML = "";
-          updateResult();
-        };
-        suggestionsDiv.appendChild(div);
-      });
+      siteData
+        .filter(item =>
+          normalize(item.siteName).includes(term) ||
+          normalizeAddress(item.address).includes(term) ||
+          normalizeAddress(item.jibunAddress).includes(term) ||
+          normalize(item.elevator).includes(term)
+        )
+        .slice(0, 20)
+        .forEach(item => {
+          const div = document.createElement("div");
+          div.className = "suggestion-item";
+          div.textContent = `${item.siteName} | ${item.elevator} | ${shortenAddress(item.address)}`;
+          div.onclick = () => {
+            selectedSite = item;
+            searchBox.value = item.siteName;
+            suggestionsDiv.innerHTML = "";
+            updateResult();
+          };
+          suggestionsDiv.appendChild(div);
+        });
 
       updateResult();
     });
@@ -300,6 +310,7 @@
     memoBox.addEventListener("input", updateResult);
     phoneBox.addEventListener("input", updateResult);
 
+    // 라디오 재토글 허용
     selectBox.addEventListener("click", (e) => {
       if (e.target.tagName === "INPUT" && e.target.type === "radio") {
         if (e.target.wasChecked) {
@@ -315,22 +326,22 @@
       }
     });
 
+    // ====== 결과 갱신 ======
     function updateResult() {
       if (!selectedSite) {
         resultBox.textContent = "현장을 선택하세요.";
         addressText.textContent = "";
         return;
       }
-
       const selectedSignal = selectBox.querySelector('input[name="signal"]:checked');
       const signalText = selectedSignal ? `[${selectedSignal.value}] ` : "";
 
-      const siteName = selectedSite.siteName;
-      const elevator = selectedSite.elevator.replace("-", "");
+      const siteName = selectedSite.siteName || "";
+      const elevator = (selectedSite.elevator || "").replace("-", "");
       const modelInfo = selectedSite.extra || "";
       const phone = phoneBox.value.trim();
       const memo = memoBox.value.trim();
-      const addrInfo = shortenAddress(selectedSite.address);
+      const addrInfo = shortenAddress(selectedSite.address || "");
 
       const formatted = `${signalText}${siteName} ${elevator}`
         + (phone ? `\n${phone}` : "")
@@ -339,12 +350,13 @@
         + (modelInfo ? `\n${modelInfo}` : "");
 
       resultBox.textContent = formatted;
-      addressText.textContent = `${selectedSite.address}\n${selectedSite.jibunAddress}`;
+      addressText.textContent = `${selectedSite.address || ""}\n${selectedSite.jibunAddress || ""}`;
     }
 
+    // ====== 네이버 지도 열기 ======
     naverIcon.addEventListener("click", () => {
       if (!selectedSite) return;
-      const addr = encodeURIComponent(selectedSite.address);
+      const addr = encodeURIComponent(selectedSite.address || "");
       const webUrl = `https://map.naver.com/v5/search/${addr}`;
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -357,6 +369,7 @@
       }
     });
 
+    // ====== 복사/리셋 ======
     function copyResult() {
       const text = resultBox.textContent.trim();
       if (!text || text.includes("현장을 선택") || text.includes("데이터를 불러오는 중")) return;
