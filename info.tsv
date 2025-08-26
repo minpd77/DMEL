@@ -1,0 +1,127 @@
+name: Fetch Google Sheet (HTML) → TSV
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"  # 30분마다
+
+jobs:
+  fetch-and-convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas lxml html5lib beautifulsoup4
+
+      - name: Make data dir
+        run: mkdir -p data tools
+
+      - name: Add converter script
+        run: |
+          cat > tools/sheet_to_tsv.py << 'PY'
+import re, sys, io
+import pandas as pd
+import requests
+
+PUBHTML = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pubhtml?gid=1374895459&single=true"
+
+def fetch_html(url: str) -> str:
+    r = requests.get(url, timeout=30)
+    r.raise_for_status()
+    return r.text
+
+def pick_table(html: str) -> pd.DataFrame:
+    # 표가 여러 개인 경우, 행이 가장 많은 것을 채택
+    tables = pd.read_html(io.StringIO(html))
+    if not tables:
+        raise RuntimeError("HTML 표를 찾지 못했습니다.")
+    tables.sort(key=lambda df: len(df), reverse=True)
+    return tables[0]
+
+def norm_header(s: str) -> str:
+    s = str(s or "").strip()
+    s = re.sub(r"\s+", "", s)
+    return s
+
+def first_nonempty(row, candidates):
+    for c in candidates:
+        if c in row and pd.notna(row[c]) and str(row[c]).strip() != "":
+            return str(row[c]).strip()
+    return ""
+
+def normalize_elev(s: str) -> str:
+    digits = re.sub(r"\D", "", str(s or ""))
+    if not digits:
+        return ""
+    return digits.zfill(7)  # 7자리
+
+def main():
+    html = fetch_html(PUBHTML)
+    df = pick_table(html)
+
+    # 헤더 정규화
+    df.columns = [norm_header(c) for c in df.columns]
+
+    # 후보 헤더들(한국어/영문 혼용 대비)
+    keys = {
+        "siteName": ["현장명","현장이름","Site","site","name","이름"],
+        "zone": ["구역","팀","Team","zone"],
+        "address": ["주소","도로명주소","address","roadaddress"],
+        "jibunAddress": ["지번주소","지번","jibun","lotaddress"],
+        "elevator": ["승강기번호","고유번호","no_plaq","plaq","ELEVATORNO","ELENO","ELENO","elvno"],
+        "extra": ["기종","특이사항","비고","모델","Model","etc","추가정보"],
+    }
+
+    # 실제 컬럼 이름 매핑: 정규화된 키에서 가능한 후보명을 찾아 존재하는 컬럼을 고름
+    def resolve_cols():
+        resolved = {}
+        for out, cand in keys.items():
+            found = None
+            for k in cand:
+                nk = norm_header(k)
+                if nk in df.columns:
+                    found = nk
+                    break
+            resolved[out] = found
+        return resolved
+
+    cols = resolve_cols()
+
+    # 출력 데이터프레임 구성
+    out_rows = []
+    for _, row in df.iterrows():
+        R = {}
+        R["siteName"]     = first_nonempty(row, [cols["siteName"]]) if cols["siteName"] else ""
+        R["zone"]         = first_nonempty(row, [cols["zone"]]) if cols["zone"] else ""
+        R["address"]      = first_nonempty(row, [cols["address"]]) if cols["address"] else ""
+        R["jibunAddress"] = first_nonempty(row, [cols["jibunAddress"]]) if cols["jibunAddress"] else ""
+        R["elevator"]     = normalize_elev(first_nonempty(row, [cols["elevator"]]) if cols["elevator"] else "")
+        R["extra"]        = first_nonempty(row, [cols["extra"]]) if cols["extra"] else ""
+        # 최소한 siteName/주소/승강기번호 중 하나는 있어야 의미 있는 행으로 간주
+        if (R["siteName"] or R["address"] or R["elevator"]):
+            out_rows.append(R)
+
+    out = pd.DataFrame(out_rows, columns=["siteName","zone","address","jibunAddress","elevator","extra"])
+    out.to_csv("data/sites.tsv", sep="\t", index=False, encoding="utf-8")
+
+if __name__ == "__main__":
+    main()
+PY
+
+      - name: Run converter
+        run: python tools/sheet_to_tsv.py
+
+      - name: Commit TSV if changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update data/sites.tsv (from pubhtml)"
+          file_pattern: data/sites.tsv
