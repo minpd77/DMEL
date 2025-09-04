@@ -115,7 +115,7 @@
       flex: 1;
     }
     .naver-icon {
-      width: 32px; /* 기존 28px → 15% 확대 */
+      width: 32px;
       height: 32px;
       cursor: pointer;
       flex-shrink: 0;
@@ -342,18 +342,17 @@
       addressText.textContent = `${selectedSite.address}\n${selectedSite.jibunAddress}`;
     }
 
+    // ✅ 모바일에서는 앱만, 페이지 유지
     naverIcon.addEventListener("click", () => {
       if (!selectedSite) return;
       const addr = encodeURIComponent(selectedSite.address);
-      const webUrl = `https://map.naver.com/v5/search/${addr}`;
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
       if (isMobile) {
         const appUrl = `nmap://search?query=${addr}`;
         window.location.href = appUrl;
-        setTimeout(() => { window.location.href = webUrl; }, 800);
       } else {
-        window.open(webUrl, "_blank");
+        window.open(`https://map.naver.com/v5/search/${addr}`, "_blank");
       }
     });
 
