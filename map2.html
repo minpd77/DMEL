@@ -28,17 +28,27 @@
 
   #searchBox {
     position: fixed; bottom: 10px; left: 10px; max-width: 280px;
-    width: calc(100vw - 40px); background: white; padding: 6px 10px;
+    width: calc(100vw - 40px); background: white; padding: 6px 10px 10px;
     border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     z-index: 1000; font-size: 14px; overflow-wrap: break-word; word-break: break-word;
   }
+  #searchBoxInner { position: relative; }
   #searchInput {
     width: 100%; box-sizing: border-box; padding: 4px 8px; font-size: 14px;
     border: 1px solid #ccc; border-radius: 4px;
+    padding-right: 58px; /* 배지+X 공간 */
   }
   #searchClear {
-    position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
     cursor: pointer; font-weight: bold; color: #999; user-select: none;
+  }
+  /* 검색 결과 개수 배지(검색 중일 때만 표시) */
+  #searchCount {
+    position: absolute; right: 28px; top: 50%; transform: translateY(-50%);
+    background: #ffeb3b; color: #000; border-radius: 10px;
+    padding: 1px 6px; font-size: 12px; font-weight: 800;
+    display: none;
+    border: 1px solid rgba(0,0,0,0.2);
   }
 
   /* 내 위치 버튼 (맨 아래) */
@@ -80,7 +90,7 @@
 
   /* 필터 박스 */
   .team-filter {
-    position: fixed; bottom: 160px; right: 10px; max-width: 180px;
+    position: fixed; bottom: 160px; right: 10px; max-width: 200px;
     background: white; padding: 8px 12px; border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 1000; font-size: 14px;
     display: flex; flex-direction: column; gap: 6px;
@@ -101,9 +111,12 @@
   <div id="speedBox" style="display:none">속도: <span id="speedVal">0</span> km/h</div>
   <div id="map"></div>
 
-  <div id="searchBox" role="search">
-    <input type="text" id="searchInput" placeholder="검색어 입력" aria-label="검색어 입력" />
-    <span id="searchClear" title="검색어 지우기" aria-label="검색어 지우기">×</span>
+  <div id="searchBox" role="search" aria-label="현장 검색">
+    <div id="searchBoxInner">
+      <input type="text" id="searchInput" placeholder="검색어 입력" aria-label="검색어 입력" />
+      <span id="searchCount" aria-live="polite">0</span>
+      <span id="searchClear" title="검색어 지우기" aria-label="검색어 지우기">×</span>
+    </div>
   </div>
 
   <div id="locationBtn" title="내 현재 위치 표시" role="button" tabindex="0">
@@ -114,11 +127,12 @@
   <div id="nameToggle" class="on" title="마커 아래 현장명 표시 토글">현장명</div>
   <button id="refreshBtn" title="데이터 새로고침" aria-live="polite">새로고침</button>
 
-  <!-- 필터 (순서: 강남팀, 강북팀, 경기, 검사필요, 검사(정기정밀)) -->
-  <div class="team-filter" aria-label="팀 필터">
+  <!-- 필터 (강남, 강북, 경기, 식당, 검사필요, 검사(정기정밀)) -->
+  <div class="team-filter" aria-label="팀/구역/분류 필터">
     <label><input type="checkbox" value="강남팀" checked> 강남팀 <span id="cntGangnam"></span></label>
     <label><input type="checkbox" value="강북팀" checked> 강북팀 <span id="cntGangbuk"></span></label>
     <label><input type="checkbox" value="경기" checked> 경기 <span id="cntGyeonggi"></span></label>
+    <label><input type="checkbox" value="식당"> 식당</label>
     <label><input type="checkbox" value="검사필요"> 검사필요 <span id="cntNeed"></span></label>
     <label><input type="checkbox" value="검사정기정밀"> 검사(정기정밀) <span id="cntCheck"></span></label>
   </div>
@@ -135,20 +149,19 @@
 
   // ==== COLORS & INDEX ====
   const colors = {
-    orange: "rgba(246,187,67,1)",
+    orange: "rgba(246,187,67,1)",      // 검색 강조(주황색)
     gray: "rgba(153,153,153,0.7)",
     gray75: "rgba(153,153,153,0.5)",
-    green: "rgba(0,192,75,1)",
-    blue: "rgba(0,25,244,1)",
-    red: "rgba(255,59,59,1)",
-    // 경기 전용 색상
-    gyeonggi: "rgb(100, 52, 143)"
+    green: "rgba(0,192,75,1)",         // 강남
+    blue: "rgba(0,25,244,1)",          // 강북
+    red: "rgba(255,59,59,1)",          // 검사필요/식당
+    gyeonggi: "rgb(100, 52, 143)"      // 경기
   };
   const idx = {
     coord:1, address:7, special:21, checkDate:11,
     wNum:23, contact:24, model:27, fan:28,
     biTongNum:26, expire:30, siteName:32,
-    team:19,  // T열 (구역/팀 기입 칸)
+    team:19,  // T열 (구역/팀/분류)
     biTongEquip:16
   };
 
@@ -159,6 +172,7 @@
   let locationOnFlag=false, currentSpeed=0;
   let showSiteNames = true;
   let refreshSeq = 0;
+  let lastSearchTerm = ""; // 검색 전환 감지용
 
   // ==== LOCATION ====
   const locationBtn = document.getElementById("locationBtn"),
@@ -205,9 +219,32 @@
 
   // ==== SEARCH ====
   const searchInput = document.getElementById("searchInput"),
-        searchClear = document.getElementById("searchClear");
-  searchInput.addEventListener("input", updateMarkerHighlighting);
-  searchClear.addEventListener("click", () => { searchInput.value=""; updateMarkerHighlighting(); });
+        searchClear = document.getElementById("searchClear"),
+        searchCount = document.getElementById("searchCount");
+
+  // 입력 변화 감지: "문자열 → 빈 문자열" 전환 시 리프레시
+  searchInput.addEventListener("input", () => {
+    const now = (searchInput.value || "").trim();
+    if (lastSearchTerm && now === "") {
+      // 검색 종료 전환: 필터 기준으로 깔끔히 재빌드
+      searchCount.style.display = 'none';
+      searchCount.textContent = '0';
+      lastSearchTerm = "";
+      fetchTSVandPlot(refreshSeq); // 리프레시
+      return;
+    }
+    lastSearchTerm = now;
+    updateMarkerHighlighting();
+  });
+
+  // X(지우기) 클릭: 즉시 리프레시
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    searchCount.style.display = 'none';
+    searchCount.textContent = '0';
+    lastSearchTerm = "";
+    fetchTSVandPlot(refreshSeq); // 리프레시
+  });
 
   // ==== FILTER ====
   const teamFilterInputs = document.querySelectorAll(".team-filter input");
@@ -257,7 +294,7 @@
 
     const rowsRaw = tsvText.trim().split("\n").slice(1).map(r => r.split("\t"));
 
-    // 날짜가 있는 행과 없는 행 분리
+    // 날짜가 있는 행과 없는 행 분리(표시 우선순위용 정렬에만 사용, 제외 조건 X)
     const rowsWithDate = [], rowsWithoutDate = [];
     rowsRaw.forEach(row => {
       const date = row[0]?.trim();
@@ -269,30 +306,31 @@
     const filterGangnam  = checked.includes("강남팀");
     const filterGangbuk  = checked.includes("강북팀");
     const filterGyeonggi = checked.includes("경기");
+    const filterRestaurant = checked.includes("식당");
     const filterNeed     = checked.includes("검사필요");
     const filterCheck    = checked.includes("검사정기정밀");
-    const searchTerm = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+
+    // ✅ 필터가 하나라도 선택됐는지
+    const anyFilterSelected = filterGangnam || filterGangbuk || filterGyeonggi || filterRestaurant || filterNeed || filterCheck;
+
+    const termRaw = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+    const searchMode = termRaw.length > 0;
+    const norm = s => (s||"").toLowerCase().replace(/[\s\-]/g,'');
 
     let cntGN=0, cntGB=0, totalGN=0, totalGB=0, totalGG=0, cntNeedNum=0, cntCheckNum=0;
     const coordGroups = {};
     const newKeys = new Set();
 
     rows.forEach(row => {
-      const tCell = (row[idx.team] || "").trim();       // T열 (구역/팀)
+      const tCell = (row[idx.team] || "").trim();       // T열 (구역/팀/분류)
       if (tCell.includes("해지")) return;
 
-      // ── 경기 판정 (T열 값에 '경기' 포함)
-      const isGyeonggi = tCell.includes("경기");
-
-      // ✅ A열이 비어도 '경기'면 통과, 그 외(비-경기)는 A열 비면 스킵
-      if (!isGyeonggi && (!row[0] || row[0].trim() === "")) return;
-
-      // ▶ 경기 필터 OFF면 '경기'는 항상 숨김(검색/다른 필터보다 우선)
-      if (!filterGyeonggi && isGyeonggi) return;
+      const isGyeonggi   = tCell.includes("경기");
+      const isRestaurant = tCell.includes("식당");
 
       const coordStr = row[idx.coord];
       if (!coordStr) return;
-      const [latS, lngS] = coordStr.split(",").map(s => s.trim()); // ← 공백 제거
+      const [latS, lngS] = coordStr.split(",").map(s => s.trim());
       if (!lngS) return;
       const lat = parseFloat(latS), lng = parseFloat(lngS);
       if (isNaN(lat) || isNaN(lng)) return;
@@ -300,68 +338,112 @@
       const siteName = row[idx.siteName] || "";
       const address  = row[idx.address]  || "";
       const contact  = row[idx.contact]  || "";
-      const expire   = row[idx.expire]   || "";
-      const checkDate= row[8] || ""; // I열 (검사일)
+      const model    = row[idx.model]    || "";
+      const wnum     = (row[idx.wNum] || "").replace(/\D/g,'');
 
-      // 경기 총계 집계(표시용)
-      if (isGyeonggi) totalGG++;
+      const checkDateCell = row[idx.checkDate] || "";
+      const expire   = row[idx.expire] || "";
+      const checkDateI= row[8] || "";
 
       // 팀 총계/분자 집계(기존 로직 유지)
       if (tCell.includes("강남팀")) totalGN++;
       if (tCell.includes("강북팀")) totalGB++;
 
-      const hasDate = !!row[idx.checkDate] && isValidDate(row[idx.checkDate]);
+      const hasDate = !!checkDateCell && isValidDate(checkDateCell);
       if (tCell.includes("강남팀") && hasDate) cntGN++;
       if (tCell.includes("강북팀") && hasDate) cntGB++;
+
+      // 경기 총계
+      if (isGyeonggi) totalGG++;
 
       const dDay = calcDateDiffNumber(expire);
       const isNeed = dDay !== null && dDay >= 0 && dDay <= 60;
       if (isNeed) cntNeedNum++;
 
-      const checkD = calcDateDiffNumber(checkDate);
+      const checkD = calcDateDiffNumber(checkDateI);
       const isCheckValid = checkD !== null && checkD >= 0;
       if (isCheckValid) cntCheckNum++;
 
+      // ── 검색 매치 판단
+      const isSearchHit = searchMode && norm(`${siteName} ${address} ${contact} ${model} ${wnum}`).includes(norm(termRaw));
+
+      // ── 현재 필터 범위 포함여부(A열 여부 무시, 오직 필터 스위치만)
+      let passesFilter = true, layer = null;
+      if (anyFilterSelected) {
+        if (filterNeed) {
+          passesFilter = isNeed;
+        } else if (filterCheck) {
+          passesFilter = isCheckValid;
+        } else {
+          const inGangnam = tCell.includes("강남팀");
+          const inGangbuk = tCell.includes("강북팀");
+
+          passesFilter =
+            (filterRestaurant && isRestaurant) ||
+            (filterGangnam && inGangnam) ||
+            (filterGangbuk && inGangbuk) ||
+            (filterGyeonggi && isGyeonggi);
+
+          if (filterRestaurant && isRestaurant) layer = "restaurant";
+          else if (filterGangnam && inGangnam)  layer = "gangnam";
+          else if (filterGangbuk && inGangbuk)  layer = "gangbuk";
+          else if (filterGyeonggi && isGyeonggi)layer = "gyeonggi";
+        }
+        if (!passesFilter) return; // ✅ 필터가 선택되어 있으면 필터 밖은 숨김
+      }
+
+      // ── 표시/색상 결정
       let show=false, color="", labelText="", zIndex=500;
 
-      const matchesSearch = () => {
-        const combined = `${siteName} ${address} ${contact}`.toLowerCase();
-        return combined.includes(searchTerm);
-      };
-
-      if (searchTerm && matchesSearch()) {
-        // 검색 강조(주황) — 다만 위에서 경기 OFF면 이미 제외됨
-        show=true; color=colors.orange; labelText=""; zIndex=1000;
-      } else if (filterNeed) {
-        show=true;
-        if (isNeed) { color=colors.red; labelText=`${Math.abs(dDay)}`; zIndex=1000; }
-        else { color=colors.gray75; zIndex=10; }
-      } else if (filterCheck) {
-        show=true;
-        if (isCheckValid) { color=colors.red; labelText=`${checkD}`; zIndex=1000; }
-        else { color=colors.gray75; zIndex=10; }
-      } else {
-        // 팀/구역 필터 우선순위: 강남 → 강북 → 경기
-        let layer = null;
-        if (filterGangnam && tCell.includes("강남팀")) layer = "gangnam";
-        else if (filterGangbuk && tCell.includes("강북팀")) layer = "gangbuk";
-        else if (filterGyeonggi && isGyeonggi)       layer = "gyeonggi";
-
-        if (layer) {
+      if (searchMode) {
+        if (!anyFilterSelected) {
+          // ✅ 필터 없음 + 검색: 히트만 표시
+          if (!isSearchHit) return;
+          show = true; color = colors.orange; zIndex = 1000;
+        } else {
+          // ✅ 필터 있음 + 검색: 필터 안에서만 표시, 히트=주황 / 미히트=회색
           show = true;
-          if (hasDate && row[idx.checkDate] !== expire) {
-            color = colors.gray; zIndex = 10;
-          } else {
-            color = (layer === "gangnam") ? colors.green
-                 : (layer === "gangbuk") ? colors.blue
-                 : /* layer === "gyeonggi" */ colors.gyeonggi;
-            zIndex = 1000;
+          if (filterNeed) {
+            if (isNeed) { labelText = `${Math.abs(dDay)}`; }
+          } else if (filterCheck) {
+            if (isCheckValid) { labelText = `${checkD}`; }
           }
+          color = isSearchHit ? colors.orange : colors.gray75;
+          zIndex = isSearchHit ? 1000 : 10;
+        }
+      } else {
+        // 검색 아님 → 기존 필터 표시 로직
+        if (anyFilterSelected) {
+          if (filterNeed) {
+            show=true;
+            if (isNeed) { color=colors.red; labelText=`${Math.abs(dDay)}`; zIndex=1000; }
+            else { color=colors.gray75; zIndex=10; }
+          } else if (filterCheck) {
+            show=true;
+            if (isCheckValid) { color=colors.red; labelText=`${checkD}`; zIndex=1000; }
+            else { color=colors.gray75; zIndex=10; }
+          } else {
+            show = true;
+            if (hasDate && checkDateCell !== expire && layer !== "restaurant") {
+              color = colors.gray; zIndex = 10;
+            } else {
+              color = (layer === "restaurant") ? colors.red
+                   : (layer === "gangnam")    ? colors.green
+                   : (layer === "gangbuk")    ? colors.blue
+                   : (layer === "gyeonggi")   ? colors.gyeonggi
+                   : colors.gray75;
+              zIndex = (color===colors.gray||color===colors.gray75) ? 10 : 1000;
+            }
+          }
+        } else {
+          // 필터 전부 해제 + 비검색 → 표시 안 함(원하면 여기서 기본 표시 로직으로 바꿀 수 있음)
+          return;
         }
       }
 
       if (!show) return;
 
+      // ── 그룹핑 및 마커 데이터 구성
       const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
       newKeys.add(key);
       if (!coordGroups[key]) coordGroups[key] = { lat, lng, entries: [], color, labelText, zIndex };
@@ -389,6 +471,7 @@
           padding:2px 4px; border-radius:4px; white-space:nowrap;
           box-shadow:0 1px 3px rgba(0,0,0,0.2);
         ">${siteName}</div>` : "";
+
       const iconHtml = `<div style="position:relative;width:18px;height:18px;">
           <div style="background-color:${color};width:18px;height:18px;border-radius:50%;border:2px solid white;"></div>
           ${labelHtml}
@@ -405,13 +488,20 @@
               wr = row[idx.wNum] || "",
               ct = row[idx.contact] || "",
               md = row[idx.model] || "",
-              fn = row[idx.fan] || "",
+              fn = (row[idx.fan] || "").trim(),
               bt = row[idx.biTongNum] || "",
               eq = row[idx.biTongEquip] || "",
               ex = row[idx.expire] || "";
         const wp = wr.replace(/\D/g, '').padStart(7, "0");
         const dm = calcDateDiff(ex);
         const nlink = `nmap://search?query=${encodeURIComponent(addr)}`;
+
+        // 팝업 안 Fan 색 점(ON=초록, OFF=빨강)
+        const fLower = fn.toLowerCase();
+        let fCol = "#9e9e9e";
+        if (fLower.includes("on")) fCol = "#00c04b";
+        else if (fLower.includes("off")) fCol = "#ff3b3b";
+
         return `
           <strong><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${wp}" target="_blank">${sn} (${wp})</a></strong><br/>
           <a href="${nlink}" target="_blank">${addr}</a><br/>
@@ -419,7 +509,7 @@
           특이사항: ${sp}<br/>
           점검: ${cd}<br/>
           기종: ${md}<br/>
-          Fan: ${fn}<br/>
+          Fan: <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${fCol};border:1px solid #999;margin-right:4px;vertical-align:middle;"></span>${fn}<br/>
           비통번호: ${bt}<br/>
           비통장비: ${eq}<br/>
           유효기간: ${ex} ${dm}<br/>
@@ -473,7 +563,7 @@
       }
     });
 
-    updateMarkerHighlighting();
+    updateMarkerHighlighting(); // 검색 반영 및 배지 업데이트
     return { seq, done:true, markerCount: markerData.length };
   }
 
@@ -501,8 +591,10 @@
   }
 
   function updateMarkerHighlighting() {
-    const termRaw = (document.getElementById("searchInput").value || "").trim().toLowerCase();
-    const term = termRaw.replace(/[\s\-]/g, "");
+    const termRaw = (document.getElementById("searchInput").value || "").trim();
+    const term = termRaw.toLowerCase().replace(/[\s\-]/g, "");
+
+    let hits = 0;
 
     markerData.forEach(o => {
       let html = o.popupHtmlOriginal;
@@ -528,7 +620,7 @@
         html = html.replace(/@@LINK(\d+)@@/g, (_, i) => links[parseInt(i)]);
       }
 
-      const newColor = term ? (hit ? colors.orange : colors.gray75) : o.baseColor;
+      const newColor = term ? (hit ? colors.orange : colors.gray75) : o.baseColor; // 검색=주황
       const zIndex = term ? (hit ? 1000 : 10) : ((newColor === colors.gray || newColor === colors.gray75) ? 10 : 1000);
 
       o.marker.setIcon(L.divIcon({
@@ -540,7 +632,18 @@
       }));
       o.marker.setZIndexOffset(zIndex);
       o.marker.getPopup().setContent(html);
+
+      if (term && hit) hits++;
     });
+
+    // 검색 개수 배지 표시/숨김
+    if (term) {
+      searchCount.style.display = 'inline-block';
+      searchCount.textContent = String(hits);
+    } else {
+      searchCount.style.display = 'none';
+      searchCount.textContent = '0';
+    }
   }
 
   // 초기 로딩
