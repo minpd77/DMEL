@@ -2,51 +2,174 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>대명엘리베이터(주)현장지도,신고양식</title>
+<title>DMEL Dashboard</title>
 <style>
-  body {
+  body, html {
     margin: 0;
     padding: 0;
-    height: 100vh;
-    display: flex;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
   }
+
+  .container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+  }
+
   .left {
-    width: 70%;
-    height: 100%;
+    flex: 7;
+    border-right: 2px solid #ccc;
   }
+
   .right {
-    width: 30%;
-    height: 100%;
+    flex: 3;
+    display: flex;
+    flex-direction: column;
   }
+
+  .right-top {
+    flex: 8;
+    border-bottom: 2px solid #ccc;
+  }
+
+  .right-bottom {
+    flex: 2;
+    padding: 10px;
+  }
+
   iframe {
     width: 100%;
     height: 100%;
     border: none;
   }
-  
-  /* 모바일 화면에서는 위아래 배치 */
-  @media (max-width: 768px) {
-    body {
-      flex-direction: column;
-    }
-    .left, .right {
-      width: 100%;
-      height: 50vh;
-    }
+
+  .control-btn {
+    padding: 10px 18px;
+    margin: 5px;
+    border: 1px solid #999;
+    border-radius: 8px;
+    background: #eee;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .active {
+    background: orange !important;
+    color: white !important;
+    font-weight: bold;
   }
 </style>
 </head>
 <body>
 
-<div class="left">
-  <iframe src="https://minpd77.github.io/DMEL/map2.html"></iframe>
+<div class="container">
+  <div class="left">
+    <iframe id="leftFrame" src="https://minpd77.github.io/DMEL/map2.html"></iframe>
+  </div>
+
+  <div class="right">
+    <div class="right-top">
+      <iframe id="rightFrame" src="https://minpd77.github.io/DMEL/dm119.html"></iframe>
+    </div>
+
+    <div class="right-bottom">
+      <button class="control-btn" data-sec="0">정지</button>
+      <button class="control-btn" data-sec="10">10초</button>
+      <button class="control-btn" data-sec="15">15초</button>
+      <button class="control-btn" data-sec="30">30초</button>
+      <button class="control-btn" data-sec="45">45초</button>
+      <button class="control-btn" data-sec="60">60초</button>
+    </div>
+  </div>
 </div>
 
-<div class="right">
-  <iframe src="https://minpd77.github.io/DMEL/dm119.html"></iframe>
-</div>
+<script>
+let timer = null;
+const buttons = document.querySelectorAll(".control-btn");
+const leftFrame = document.getElementById("leftFrame");
+
+/* 기본 정지 버튼 활성 */
+document.querySelector('.control-btn[data-sec="0"]').classList.add("active");
+
+/* iframe 로드 여부 체크 */
+let mapLoaded = false;
+
+leftFrame.addEventListener("load", () => {
+  console.log("map2.html loaded");
+  mapLoaded = true;
+});
+
+/* 버튼 클릭 함수 */
+function clickMapRefreshBtn() {
+  if (!mapLoaded) {
+    console.warn("map2 not loaded yet");
+    return;
+  }
+
+  try {
+    const innerDoc = leftFrame.contentDocument || leftFrame.contentWindow.document;
+
+    // 버튼 다시 찾기
+    let refreshBtn = innerDoc.querySelector("#refreshBtn");
+
+    if (!refreshBtn) {
+      console.warn("refreshBtn not found, retrying...");
+      retryFindButton(5);
+      return;
+    }
+
+    refreshBtn.click();
+    console.log("refreshBtn clicked!");
+
+  } catch (e) {
+    console.error("button click error:", e);
+  }
+}
+
+/* 버튼 못 찾았을 때 재시도 */
+function retryFindButton(retries) {
+  if (retries <= 0) return;
+
+  setTimeout(() => {
+    const innerDoc = leftFrame.contentDocument || leftFrame.contentWindow.document;
+    let refreshBtn = innerDoc.querySelector("#refreshBtn");
+
+    if (refreshBtn) {
+      refreshBtn.click();
+      console.log("refreshBtn found on retry!");
+    } else {
+      retryFindButton(retries - 1);
+    }
+  }, 500);
+}
+
+/* 버튼 이벤트 */
+buttons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    let sec = parseInt(btn.dataset.sec, 10);
+
+    buttons.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+
+    if (sec === 0) return;
+
+    if (sec < 10) return;
+
+    timer = setInterval(() => {
+      clickMapRefreshBtn();
+    }, sec * 1000);
+  });
+});
+</script>
 
 </body>
 </html>
