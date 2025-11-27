@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DMEL Dual View</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+  .left {
+    width: 70%;
+    height: 100%;
+  }
+  .right {
+    width: 30%;
+    height: 100%;
+  }
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+  
+  /* 모바일 화면에서는 위아래 배치 */
+  @media (max-width: 768px) {
+    body {
+      flex-direction: column;
+    }
+    .left, .right {
+      width: 100%;
+      height: 50vh;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="left">
+  <iframe src="https://minpd77.github.io/DMEL/map2.html"></iframe>
+</div>
+
+<div class="right">
+  <iframe src="https://minpd77.github.io/DMEL/dm119.html"></iframe>
+</div>
+
+</body>
+</html>
