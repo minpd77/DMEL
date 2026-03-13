@@ -219,10 +219,17 @@ return escapeHtml(s);
 }
 
 function openNaverMap(address){
+
 let addr=String(address||"").trim();
 if(!addr){
 alert("주소가 없습니다.");
 return;
+}
+
+let encoded=encodeURIComponent(addr);
+
+/* 네이버지도 앱 바로 실행 */
+location.href = "nmap://search?query=" + encoded + "&appname=elevator";
 }
 
 let encoded=encodeURIComponent(addr);
