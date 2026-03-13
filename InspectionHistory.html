@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<style>
+
+body{
+font-family:Arial;
+background:#f5f5f5;
+margin:10px;
+}
+
+button{
+padding:8px 14px;
+margin:4px;
+border:none;
+border-radius:6px;
+background:#444;
+color:white;
+font-weight:bold;
+cursor:pointer;
+}
+
+#search{
+width:100%;
+padding:10px;
+font-size:16px;
+border-radius:8px;
+border:1px solid #ccc;
+margin-top:6px;
+}
+
+#suggest{
+background:white;
+border-radius:8px;
+margin-top:3px;
+}
+
+.sitem{
+padding:8px;
+cursor:pointer;
+}
+
+.sitem:hover{
+background:#eee;
+}
+
+.item{
+padding:12px;
+margin-bottom:10px;
+border-radius:10px;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
+cursor:pointer;
+}
+
+.ok{
+background:#e8f7e8;
+}
+
+.warn{
+background:#ffe6e6;
+}
+
+.precise{
+color:red;
+font-weight:bold;
+}
+
+.detail{
+display:none;
+margin-top:10px;
+white-space:pre-line;
+font-size:14px;
+}
+
+.red{
+color:red;
+}
+
+.redbold{
+color:red;
+font-weight:bold;
+}
+
+</style>
+</head>
+
+<body>
+
+<button onclick="showArea('gangbuk')">강북</button>
+<button onclick="showArea('gangnam')">강남</button>
+
+<input id="search" placeholder="건물명 / 승강기번호 검색">
+
+<div id="suggest"></div>
+
+<div id="container">로딩중...</div>
+
+<script>
+
+const ACSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1134037580&single=true&output=csv";
+
+const BCSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1183872898&single=true&output=csv";
+
+let data={gangbuk:[],gangnam:[]};
+let dbRows=[];
+let defectDB={};
+let keywordList=[];
+let currentArea="gangbuk";
+
+function parseCSV(t){
+return t.split("\n").map(r=>r.split(","));
+}
+
+function pad7(n){
+return String(n).padStart(7,"0");
+}
+
+function extract7(link){
+if(!link) return "";
+let m=link.match(/\d+/g);
+if(!m) return "";
+return pad7(m[m.length-1]);
+}
+
+function today(){
+let d=new Date();
+return d.toISOString().slice(0,10).replace(/-/g,"");
+}
+
+function isExpired(d){
+if(!d) return false;
+let v=d.replace(/-/g,"");
+return v<today();
+}
+
+function formatDate(d){
+if(!d) return "";
+let date=new Date(d);
+if(isNaN(date)) return d;
+const day=["일","월","화","수","목","금","토"];
+let yy=String(date.getFullYear()).slice(2);
+let mm=String(date.getMonth()+1).padStart(2,"0");
+let dd=String(date.getDate()).padStart(2,"0");
+return yy+"-"+mm+"-"+dd+"("+day[date.getDay()]+")";
+}
+
+function formatDefect(t){
+if(!t) return "";
+return t.replace(/(\d+\))/g,"<br>$1").replace(/^<br>/,"");
+}
+
+function toggle(el){
+let d=el.querySelector(".detail");
+d.style.display=d.style.display=="block"?"none":"block";
+}
+
+function sortData(arr){
+arr.sort((a,b)=>{
+let da=new Date(a.date+" "+a.time);
+let db=new Date(b.date+" "+b.time);
+return da-db;
+});
+}
+
+Promise.all([
+fetch(ACSV).then(r=>r.text()),
+fetch(BCSV).then(r=>r.text())
+]).then(([a,b])=>{
+
+let rowsB=parseCSV(b);
+
+rowsB.slice(1).forEach(c=>{
+
+let rawId=(c[1]||"").trim();
+let id=pad7(rawId);
+
+let row={
+name:c[0]||"",
+id:id,
+
+Y:c[24]||"",
+Z:c[25]||"",
+AA:c[26]||"",
+AC:c[28]||"",
+AE:c[30]||"",
+AF:c[31]||"",
+AN:c[39]||""
+
+};
+
+dbRows.push(row);
+defectDB[id]=row.AN;
+
+if(row.name) keywordList.push(row.name);
+
+if(/^\d+$/.test(rawId)){
+keywordList.push(pad7(rawId));
+}
+
+});
+
+let rowsA=parseCSV(a).slice(1);
+
+let lastDate1="";
+let lastDate2="";
+
+rowsA.forEach(c=>{
+
+let date=c[0]||lastDate1;
+if(c[0]) lastDate1=c[0];
+
+if(c[3]){
+
+data.gangbuk.push({
+name:c[3],
+date:date,
+time:c[1],
+type:c[2],
+area:c[4],
+id:extract7(c[5]||"")
+});
+
+}
+
+let date2=c[8]||lastDate2;
+if(c[8]) lastDate2=c[8];
+
+if(c[11]){
+
+data.gangnam.push({
+name:c[11],
+date:date2,
+time:c[9],
+type:c[10],
+area:c[12],
+id:extract7(c[13]||"")
+});
+
+}
+
+});
+
+sortData(data.gangbuk);
+sortData(data.gangnam);
+
+renderArea();
+
+});
+
+function showArea(a){
+currentArea=a;
+renderArea();
+}
+
+function renderArea(){
+
+let container=document.getElementById("container");
+container.innerHTML="";
+
+data[currentArea].forEach(item=>{
+
+let defect=defectDB[item.id]||"";
+let hasDefect=defect.trim()!=="";
+
+let div=document.createElement("div");
+div.className="item "+(hasDefect?"warn":"ok");
+div.onclick=()=>toggle(div);
+
+let type=item.type;
+if(type.includes("정밀")){
+type='<span class="precise">'+type+"</span>";
+}
+
+let condition=hasDefect?" (조건부)":"";
+
+div.innerHTML=`
+<b>${item.name} ${item.id}${condition}</b><br>
+${formatDate(item.date)} / ${item.time} / ${type} / ${item.area}
+<div class="detail">${formatDefect(defect)}</div>
+`;
+
+container.appendChild(div);
+
+});
+
+}
+
+function renderSearch(q){
+
+let q7=pad7(q);
+
+let result=dbRows.filter(r=>
+r.name.includes(q)||
+r.id.includes(q)||
+r.id.includes(q7)
+);
+
+let container=document.getElementById("container");
+container.innerHTML="";
+
+result.forEach(r=>{
+
+let div=document.createElement("div");
+div.className="item ok";
+
+let aa=r.AA;
+let af=r.AF;
+
+let aaRed=isExpired(aa)?"red":"";
+let afRed=isExpired(af)?"red":"";
+
+let text=`
+<b>${r.name} ${r.id}</b><br><br>
+
+${r.Y} ${r.Z} ~ <span class="${aaRed}">${aa}</span><br><br>
+
+${r.AC} ${r.AE} ~ <span class="${afRed}">${af}</span><br><br>
+
+${formatDefect(r.AN)}<br><br>
+
+<a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${r.id}" target="_blank">
+승강기정보센터보기
+</a>
+`;
+
+text=text
+.replace(/미가입/g,'<span class="redbold">미가입</span>')
+.replace(/미선임/g,'<span class="redbold">미선임</span>')
+.replace(/조건부/g,'<span class="red">조건부</span>');
+
+div.innerHTML=text;
+
+container.appendChild(div);
+
+});
+
+}
+
+document.getElementById("search").addEventListener("input",function(){
+
+let v=this.value.trim();
+let s=document.getElementById("suggest");
+s.innerHTML="";
+
+if(!v){
+renderArea();
+return;
+}
+
+let q7=pad7(v);
+
+let list=keywordList
+.filter(k=>k.includes(v)||k.includes(q7))
+.slice(0,10);
+
+list.forEach(k=>{
+let d=document.createElement("div");
+d.className="sitem";
+d.innerText=k;
+d.onclick=()=>{
+document.getElementById("search").value=k;
+s.innerHTML="";
+renderSearch(k);
+};
+s.appendChild(d);
+});
+
+renderSearch(v);
+
+});
+
+</script>
+
+</body>
+</html>
