@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -219,7 +220,6 @@ return escapeHtml(s);
 }
 
 function openNaverMap(address){
-
 let addr=String(address||"").trim();
 if(!addr){
 alert("주소가 없습니다.");
@@ -227,23 +227,7 @@ return;
 }
 
 let encoded=encodeURIComponent(addr);
-
-/* 네이버지도 앱 바로 실행 */
-location.href = "nmap://search?query=" + encoded + "&appname=elevator";
-}
-
-let encoded=encodeURIComponent(addr);
-let appUrl="nmap://search?query="+encoded+"&appname=minpd.map";
-let webUrl="https://map.naver.com/p/search/"+encoded;
-
-let start=Date.now();
-location.href=appUrl;
-
-setTimeout(function(){
-if(Date.now()-start<1800){
-location.href=webUrl;
-}
-},700);
+location.href="nmap://search?query="+encoded+"&appname=naver_map";
 }
 
 Promise.all([
@@ -473,3 +457,4 @@ renderSearch(v);
 
 </body>
 </html>
+```
