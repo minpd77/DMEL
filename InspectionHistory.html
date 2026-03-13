@@ -4,7 +4,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
-
 body{
 font-family:Arial;
 background:#f5f5f5;
@@ -83,6 +82,27 @@ color:red;
 font-weight:bold;
 }
 
+.linkRow{
+display:flex;
+align-items:center;
+gap:12px;
+flex-wrap:wrap;
+}
+
+.mapIcon{
+width:22px;
+height:22px;
+vertical-align:middle;
+cursor:pointer;
+display:block;
+}
+
+.mapBtn{
+display:inline-flex;
+align-items:center;
+gap:6px;
+text-decoration:none;
+}
 </style>
 </head>
 
@@ -98,10 +118,9 @@ font-weight:bold;
 <div id="container">로딩중...</div>
 
 <script>
-
 const ACSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1134037580&single=true&output=csv";
-
 const BCSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1183872898&single=true&output=csv";
+const NAVERMAP_ICON="https://www.darun.io/_next/image?url=https%3A%2F%2Fres.cloudinary.com%2Fdqddtkvmb%2Fimage%2Fupload%2Fv1715433300%2Fimages%2Flogos%2Fnavermap.png&w=256&q=75";
 
 let data={gangbuk:[],gangnam:[]};
 let dbRows=[];
@@ -110,16 +129,16 @@ let keywordList=[];
 let currentArea="gangbuk";
 
 function parseCSV(t){
-return t.split("\n").map(r=>r.split(","));
+return t.trim().split(/\r?\n/).map(r=>r.split(","));
 }
 
 function pad7(n){
-return String(n).padStart(7,"0");
+return String(n||"").padStart(7,"0");
 }
 
 function extract7(link){
 if(!link) return "";
-let m=link.match(/\d+/g);
+let m=String(link).match(/\d+/g);
 if(!m) return "";
 return pad7(m[m.length-1]);
 }
@@ -131,37 +150,93 @@ return d.toISOString().slice(0,10).replace(/-/g,"");
 
 function isExpired(d){
 if(!d) return false;
-let v=d.replace(/-/g,"");
-return v<today();
+let v=String(d).replace(/-/g,"").trim();
+return /^\d{8}$/.test(v) && v<today();
 }
 
 function formatDate(d){
 if(!d) return "";
-let date=new Date(d);
-if(isNaN(date)) return d;
-const day=["일","월","화","수","목","금","토"];
-let yy=String(date.getFullYear()).slice(2);
+let s=String(d).trim();
+
+if(/^\d{8}$/.test(s)){
+return s.slice(0,4)+"-"+s.slice(4,6)+"-"+s.slice(6,8);
+}
+
+let date=new Date(s);
+if(isNaN(date)) return s;
+
+let yyyy=date.getFullYear();
 let mm=String(date.getMonth()+1).padStart(2,"0");
 let dd=String(date.getDate()).padStart(2,"0");
-return yy+"-"+mm+"-"+dd+"("+day[date.getDay()]+")";
+return yyyy+"-"+mm+"-"+dd;
+}
+
+function escapeHtml(s){
+return String(s||"")
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;")
+.replace(/'/g,"&#39;");
 }
 
 function formatDefect(t){
 if(!t) return "";
-return t.replace(/(\d+\))/g,"<br>$1").replace(/^<br>/,"");
+return String(t).replace(/(\d+\))/g,"<br>$1").replace(/^<br>/,"");
 }
 
 function toggle(el){
 let d=el.querySelector(".detail");
+if(!d) return;
 d.style.display=d.style.display=="block"?"none":"block";
 }
 
 function sortData(arr){
 arr.sort((a,b)=>{
-let da=new Date(a.date+" "+a.time);
-let db=new Date(b.date+" "+b.time);
+let da=new Date((a.date||"")+" "+(a.time||""));
+let db=new Date((b.date||"")+" "+(b.time||""));
 return da-db;
 });
+}
+
+function normalizeSearch(v){
+return String(v||"")
+.toLowerCase()
+.replace(/\s+/g,"")
+.trim();
+}
+
+function includesNormalized(target,query){
+return normalizeSearch(target).includes(normalizeSearch(query));
+}
+
+function highlightStatusText(v){
+let s=String(v||"").trim();
+if(/미가입|미선임/.test(s)){
+return '<span class="redbold">🚨 '+escapeHtml(s)+'</span>';
+}
+return escapeHtml(s);
+}
+
+function openNaverMap(address){
+let addr=String(address||"").trim();
+if(!addr){
+alert("주소가 없습니다.");
+return;
+}
+
+let encoded=encodeURIComponent(addr);
+let appUrl="nmap://search?query="+encoded+"&appname=minpd.map";
+let webUrl="https://map.naver.com/p/search/"+encoded;
+
+let start=Date.now();
+location.href=appUrl;
+
+setTimeout(function(){
+if(Date.now()-start<1800){
+location.href=webUrl;
+}
+},700);
 }
 
 Promise.all([
@@ -178,27 +253,24 @@ let id=pad7(rawId);
 
 let row={
 name:c[0]||"",
+nameNorm:normalizeSearch(c[0]||""),
 id:id,
+idNorm:normalizeSearch(id),
+address:c[9]||"",
 
-Y:c[24]||"",
-Z:c[25]||"",
-AA:c[26]||"",
-AC:c[28]||"",
-AE:c[30]||"",
-AF:c[31]||"",
+Y:c[26]||"",   // AA
+AA:c[28]||"",  // AC
+AC:c[30]||"",  // AE
+AF:c[33]||"",  // AH
+
 AN:c[39]||""
-
 };
 
 dbRows.push(row);
 defectDB[id]=row.AN;
 
 if(row.name) keywordList.push(row.name);
-
-if(/^\d+$/.test(rawId)){
-keywordList.push(pad7(rawId));
-}
-
+if(/^\d+$/.test(rawId)) keywordList.push(pad7(rawId));
 });
 
 let rowsA=parseCSV(a).slice(1);
@@ -212,7 +284,6 @@ let date=c[0]||lastDate1;
 if(c[0]) lastDate1=c[0];
 
 if(c[3]){
-
 data.gangbuk.push({
 name:c[3],
 date:date,
@@ -221,14 +292,12 @@ type:c[2],
 area:c[4],
 id:extract7(c[5]||"")
 });
-
 }
 
 let date2=c[8]||lastDate2;
 if(c[8]) lastDate2=c[8];
 
 if(c[11]){
-
 data.gangnam.push({
 name:c[11],
 date:date2,
@@ -237,9 +306,7 @@ type:c[10],
 area:c[12],
 id:extract7(c[13]||"")
 });
-
 }
-
 });
 
 sortData(data.gangbuk);
@@ -247,6 +314,9 @@ sortData(data.gangnam);
 
 renderArea();
 
+}).catch(err=>{
+document.getElementById("container").innerHTML="데이터 불러오기 오류";
+console.error(err);
 });
 
 function showArea(a){
@@ -255,46 +325,45 @@ renderArea();
 }
 
 function renderArea(){
-
 let container=document.getElementById("container");
 container.innerHTML="";
 
 data[currentArea].forEach(item=>{
 
 let defect=defectDB[item.id]||"";
-let hasDefect=defect.trim()!=="";
+let hasDefect=String(defect).trim()!=="";
 
 let div=document.createElement("div");
 div.className="item "+(hasDefect?"warn":"ok");
 div.onclick=()=>toggle(div);
 
-let type=item.type;
+let type=String(item.type||"");
 if(type.includes("정밀")){
-type='<span class="precise">'+type+"</span>";
+type='<span class="precise">'+escapeHtml(type)+'</span>';
+}else{
+type=escapeHtml(type);
 }
 
 let condition=hasDefect?" (조건부)":"";
 
 div.innerHTML=`
-<b>${item.name} ${item.id}${condition}</b><br>
-${formatDate(item.date)} / ${item.time} / ${type} / ${item.area}
-<div class="detail">${formatDefect(defect)}</div>
+<b>${escapeHtml(item.name)} ${escapeHtml(item.id)}${condition}</b><br>
+${formatDate(item.date)} / ${escapeHtml(item.time)} / ${type} / ${escapeHtml(item.area)}
+<div class="detail">${formatDefect(escapeHtml(defect))}</div>
 `;
 
 container.appendChild(div);
-
 });
-
 }
 
 function renderSearch(q){
-
-let q7=pad7(q);
+let normalizedQ=normalizeSearch(q);
+let q7=pad7(normalizedQ.replace(/\D/g,""));
 
 let result=dbRows.filter(r=>
-r.name.includes(q)||
-r.id.includes(q)||
-r.id.includes(q7)
+includesNormalized(r.name,q)||
+includesNormalized(r.id,q)||
+(normalizedQ && normalizeSearch(r.id).includes(normalizeSearch(q7)))
 );
 
 let container=document.getElementById("container");
@@ -305,41 +374,61 @@ result.forEach(r=>{
 let div=document.createElement("div");
 div.className="item ok";
 
-let aa=r.AA;
-let af=r.AF;
+let yText=highlightStatusText(r.Y);
+let acText=highlightStatusText(r.AC);
 
-let aaRed=isExpired(aa)?"red":"";
-let afRed=isExpired(af)?"red":"";
+let aaText=formatDate(r.AA);
+let afText=formatDate(r.AF);
 
-let text=`
-<b>${r.name} ${r.id}</b><br><br>
+let aaExpired=isExpired(r.AA);
+let afExpired=isExpired(r.AF);
 
-${r.Y} ${r.Z} ~ <span class="${aaRed}">${aa}</span><br><br>
+let aaHtml=aaExpired
+? `<span class="redbold">${escapeHtml(aaText)}</span> 🚨`
+: escapeHtml(aaText);
 
-${r.AC} ${r.AE} ~ <span class="${afRed}">${af}</span><br><br>
+let afHtml=afExpired
+? `<span class="redbold">${escapeHtml(afText)}</span> 🚨`
+: escapeHtml(afText);
 
-${formatDefect(r.AN)}<br><br>
+let defectHtml=formatDefect(escapeHtml(r.AN));
 
-<a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${r.id}" target="_blank">
+div.innerHTML=`
+<b>${escapeHtml(r.name)} ${escapeHtml(r.id)}</b><br><br>
+
+보험사 ${yText} : ${aaHtml}<br><br>
+
+안전관리자 ${acText} : ${afHtml}<br><br>
+
+${defectHtml}<br><br>
+
+<div class="linkRow">
+<a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(r.id)}" target="_blank" onclick="event.stopPropagation();">
 승강기정보센터보기
 </a>
+
+<a href="#" class="mapBtn" onclick="event.stopPropagation();return false;">
+<img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon">
+</a>
+</div>
 `;
 
-text=text
-.replace(/미가입/g,'<span class="redbold">미가입</span>')
-.replace(/미선임/g,'<span class="redbold">미선임</span>')
-.replace(/조건부/g,'<span class="red">조건부</span>');
+div.innerHTML=div.innerHTML.replace(/조건부/g,'<span class="red">조건부</span>');
 
-div.innerHTML=text;
+let mapBtn=div.querySelector(".mapBtn");
+if(mapBtn){
+mapBtn.addEventListener("click",function(e){
+e.preventDefault();
+e.stopPropagation();
+openNaverMap(r.address);
+});
+}
 
 container.appendChild(div);
-
 });
-
 }
 
 document.getElementById("search").addEventListener("input",function(){
-
 let v=this.value.trim();
 let s=document.getElementById("suggest");
 s.innerHTML="";
@@ -349,10 +438,14 @@ renderArea();
 return;
 }
 
-let q7=pad7(v);
+let normalizedV=normalizeSearch(v);
+let q7=pad7(normalizedV.replace(/\D/g,""));
 
 let list=keywordList
-.filter(k=>k.includes(v)||k.includes(q7))
+.filter(k=>
+includesNormalized(k,v)||
+(normalizedV && normalizeSearch(k).includes(normalizeSearch(q7)))
+)
 .slice(0,10);
 
 list.forEach(k=>{
@@ -368,9 +461,7 @@ s.appendChild(d);
 });
 
 renderSearch(v);
-
 });
-
 </script>
 
 </body>
