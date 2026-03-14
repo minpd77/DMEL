@@ -89,6 +89,7 @@ display:flex;
 align-items:center;
 gap:12px;
 flex-wrap:wrap;
+margin-top:12px;
 }
 
 .mapIcon{
@@ -127,11 +128,48 @@ const NAVERMAP_ICON="https://www.darun.io/_next/image?url=https%3A%2F%2Fres.clou
 let data={gangbuk:[],gangnam:[]};
 let dbRows=[];
 let defectDB={};
+let dbById={};
 let keywordList=[];
 let currentArea="gangbuk";
 
-function parseCSV(t){
-return t.trim().split(/\r?\n/).map(r=>r.split(","));
+function parseCSV(text){
+let rows=[];
+let row=[];
+let cell="";
+let inQuotes=false;
+
+text=String(text||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+
+for(let i=0;i<text.length;i++){
+let ch=text[i];
+let next=text[i+1];
+
+if(ch === '"'){
+if(inQuotes && next === '"'){
+cell += '"';
+i++;
+}else{
+inQuotes = !inQuotes;
+}
+}else if(ch === "," && !inQuotes){
+row.push(cell);
+cell="";
+}else if(ch === "\n" && !inQuotes){
+row.push(cell);
+rows.push(row);
+row=[];
+cell="";
+}else{
+cell += ch;
+}
+}
+
+row.push(cell);
+rows.push(row);
+
+return rows
+.filter(r=>!(r.length===1 && String(r[0]).trim()===""))
+.map(r=>r.map(v=>String(v||"").trim()));
 }
 
 function pad7(n){
@@ -152,16 +190,26 @@ return d.toISOString().slice(0,10).replace(/-/g,"");
 
 function isExpired(d){
 if(!d) return false;
-let v=String(d).replace(/-/g,"").trim();
+let v=normalizeDateDigits(d);
 return /^\d{8}$/.test(v) && v<today();
+}
+
+function normalizeDateDigits(d){
+return String(d||"").replace(/[^\d]/g,"").trim();
 }
 
 function formatDate(d){
 if(!d) return "";
 let s=String(d).trim();
 
-if(/^\d{8}$/.test(s)){
-return s.slice(0,4)+"-"+s.slice(4,6)+"-"+s.slice(6,8);
+let onlyNum=normalizeDateDigits(s);
+
+if(/^\d{8}$/.test(onlyNum)){
+if(onlyNum.startsWith("20")){
+return onlyNum.slice(0,4)+"-"+onlyNum.slice(4,6)+"-"+onlyNum.slice(6,8);
+}else{
+return onlyNum.slice(0,2)+"-"+onlyNum.slice(2,4)+"-"+onlyNum.slice(4,6);
+}
 }
 
 let date=new Date(s);
@@ -250,16 +298,17 @@ id:id,
 idNorm:normalizeSearch(id),
 address:c[9]||"",
 
-Y:c[26]||"",   // AA
-AA:c[28]||"",  // AC
-AC:c[30]||"",  // AE
-AF:c[33]||"",  // AH
+Y:c[26]||"",
+AA:c[28]||"",
+AC:c[30]||"",
+AF:c[33]||"",
 
 AN:c[39]||""
 };
 
 dbRows.push(row);
 defectDB[id]=row.AN;
+dbById[id]=row;
 
 if(row.name) keywordList.push(row.name);
 if(/^\d+$/.test(rawId)) keywordList.push(pad7(rawId));
@@ -324,6 +373,8 @@ data[currentArea].forEach(item=>{
 
 let defect=defectDB[item.id]||"";
 let hasDefect=String(defect).trim()!=="";
+let db=dbById[item.id]||{};
+let address=db.address||"";
 
 let div=document.createElement("div");
 div.className="item "+(hasDefect?"warn":"ok");
@@ -341,8 +392,28 @@ let condition=hasDefect?" (조건부)":"";
 div.innerHTML=`
 <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}${condition}</b><br>
 ${formatDate(item.date)} / ${escapeHtml(item.time)} / ${type} / ${escapeHtml(item.area)}
+
 <div class="detail">${formatDefect(escapeHtml(defect))}</div>
+
+<div class="linkRow">
+<a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(item.id)}" target="_blank" onclick="event.stopPropagation();">
+승강기정보센터보기
+</a>
+
+<a href="#" class="mapBtn" onclick="event.stopPropagation();return false;">
+<img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon">
+</a>
+</div>
 `;
+
+let mapBtn=div.querySelector(".mapBtn");
+if(mapBtn){
+mapBtn.addEventListener("click",function(e){
+e.preventDefault();
+e.stopPropagation();
+openNaverMap(address);
+});
+}
 
 container.appendChild(div);
 });
