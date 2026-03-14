@@ -73,6 +73,7 @@ display:none;
 margin-top:10px;
 white-space:pre-line;
 font-size:14px;
+line-height:1.5;
 }
 
 .red{
@@ -89,7 +90,7 @@ display:flex;
 align-items:center;
 gap:12px;
 flex-wrap:wrap;
-margin-top:12px;
+margin-top:0;
 }
 
 .mapIcon{
@@ -188,20 +189,19 @@ let d=new Date();
 return d.toISOString().slice(0,10).replace(/-/g,"");
 }
 
+function normalizeDateDigits(d){
+return String(d||"").replace(/[^\d]/g,"").trim();
+}
+
 function isExpired(d){
 if(!d) return false;
 let v=normalizeDateDigits(d);
 return /^\d{8}$/.test(v) && v<today();
 }
 
-function normalizeDateDigits(d){
-return String(d||"").replace(/[^\d]/g,"").trim();
-}
-
 function formatDate(d){
 if(!d) return "";
 let s=String(d).trim();
-
 let onlyNum=normalizeDateDigits(s);
 
 if(/^\d{8}$/.test(onlyNum)){
@@ -212,6 +212,10 @@ return onlyNum.slice(0,2)+"-"+onlyNum.slice(2,4)+"-"+onlyNum.slice(4,6);
 }
 }
 
+if(/^\d{6}$/.test(onlyNum)){
+return onlyNum.slice(0,2)+"-"+onlyNum.slice(2,4)+"-"+onlyNum.slice(4,6);
+}
+
 let date=new Date(s);
 if(isNaN(date)) return s;
 
@@ -219,6 +223,13 @@ let yyyy=date.getFullYear();
 let mm=String(date.getMonth()+1).padStart(2,"0");
 let dd=String(date.getDate()).padStart(2,"0");
 return yyyy+"-"+mm+"-"+dd;
+}
+
+function formatShortDate(d){
+let full=formatDate(d);
+let m=String(full).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+if(m) return m[1].slice(2)+"-"+m[2]+"-"+m[3];
+return full;
 }
 
 function escapeHtml(s){
@@ -262,6 +273,7 @@ return normalizeSearch(target).includes(normalizeSearch(query));
 
 function highlightStatusText(v){
 let s=String(v||"").trim();
+if(!s) return "-";
 if(/미가입|미선임/.test(s)){
 return '<span class="redbold">🚨 '+escapeHtml(s)+'</span>';
 }
@@ -274,7 +286,6 @@ if(!addr){
 alert("주소가 없습니다.");
 return;
 }
-
 let encoded=encodeURIComponent(addr);
 location.href="nmap://search?query="+encoded+"&appname=naver_map";
 }
@@ -297,12 +308,10 @@ nameNorm:normalizeSearch(c[0]||""),
 id:id,
 idNorm:normalizeSearch(id),
 address:c[9]||"",
-
 Y:c[26]||"",
 AA:c[28]||"",
 AC:c[30]||"",
 AF:c[33]||"",
-
 AN:c[39]||""
 };
 
@@ -376,6 +385,37 @@ let hasDefect=String(defect).trim()!=="";
 let db=dbById[item.id]||{};
 let address=db.address||"";
 
+let insuranceName=highlightStatusText(db.Y||"");
+let insuranceDateText=formatShortDate(db.AA||"");
+let managerName=highlightStatusText(db.AC||"");
+let managerDateText=formatDate(db.AF||"");
+
+let insuranceExpired=isExpired(db.AA);
+let managerExpired=isExpired(db.AF);
+
+let insuranceDateHtml=insuranceDateText
+? (insuranceExpired
+  ? `<span class="redbold">${escapeHtml(insuranceDateText)}</span> 🚨`
+  : escapeHtml(insuranceDateText))
+: "-";
+
+let managerDateHtml=managerDateText
+? (managerExpired
+  ? `<span class="redbold">${escapeHtml(managerDateText)}</span> 🚨`
+  : escapeHtml(managerDateText))
+: "-";
+
+let defectHtml=formatDefect(escapeHtml(defect));
+let detailParts=[];
+
+detailParts.push(`보험사 ${insuranceName} : ${insuranceDateHtml}<br>안전관리자 ${managerName} : ${managerDateHtml}`);
+
+if(String(defect).trim()!==""){
+detailParts.push(defectHtml);
+}
+
+detailParts.push(`<div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(item.id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>`);
+
 let div=document.createElement("div");
 div.className="item "+(hasDefect?"warn":"ok");
 div.onclick=()=>toggle(div);
@@ -392,18 +432,7 @@ let condition=hasDefect?" (조건부)":"";
 div.innerHTML=`
 <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}${condition}</b><br>
 ${formatDate(item.date)} / ${escapeHtml(item.time)} / ${type} / ${escapeHtml(item.area)}
-
-<div class="detail">${formatDefect(escapeHtml(defect))}</div>
-
-<div class="linkRow">
-<a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(item.id)}" target="_blank" onclick="event.stopPropagation();">
-승강기정보센터보기
-</a>
-
-<a href="#" class="mapBtn" onclick="event.stopPropagation();return false;">
-<img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon">
-</a>
-</div>
+<div class="detail">${detailParts.join("<br><br>")}</div>
 `;
 
 let mapBtn=div.querySelector(".mapBtn");
@@ -440,40 +469,32 @@ div.className="item ok";
 let yText=highlightStatusText(r.Y);
 let acText=highlightStatusText(r.AC);
 
-let aaText=formatDate(r.AA);
+let aaText=formatShortDate(r.AA);
 let afText=formatDate(r.AF);
 
 let aaExpired=isExpired(r.AA);
 let afExpired=isExpired(r.AF);
 
-let aaHtml=aaExpired
-? `<span class="redbold">${escapeHtml(aaText)}</span> 🚨`
-: escapeHtml(aaText);
+let aaHtml=aaText
+? (aaExpired
+  ? `<span class="redbold">${escapeHtml(aaText)}</span> 🚨`
+  : escapeHtml(aaText))
+: "-";
 
-let afHtml=afExpired
-? `<span class="redbold">${escapeHtml(afText)}</span> 🚨`
-: escapeHtml(afText);
+let afHtml=afText
+? (afExpired
+  ? `<span class="redbold">${escapeHtml(afText)}</span> 🚨`
+  : escapeHtml(afText))
+: "-";
 
 let defectHtml=formatDefect(escapeHtml(r.AN));
 
 div.innerHTML=`
 <b>${escapeHtml(r.name)} ${escapeHtml(r.id)}</b><br><br>
-
-보험사 ${yText} : ${aaHtml}<br><br>
-
-안전관리자 ${acText} : ${afHtml}<br><br>
-
-${defectHtml}<br><br>
-
-<div class="linkRow">
-<a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(r.id)}" target="_blank" onclick="event.stopPropagation();">
-승강기정보센터보기
-</a>
-
-<a href="#" class="mapBtn" onclick="event.stopPropagation();return false;">
-<img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon">
-</a>
-</div>
+보험사 ${yText} : ${aaHtml}<br>
+안전관리자 ${acText} : ${afHtml}
+${String(r.AN||"").trim()!=="" ? `<br><br>${defectHtml}` : ``}
+<br><br><div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(r.id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>
 `;
 
 div.innerHTML=div.innerHTML.replace(/조건부/g,'<span class="red">조건부</span>');
