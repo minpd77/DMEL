@@ -1,4 +1,4 @@
-대명엘리베이터 현장조건부 조회
+대명엘리베이터 현장 검사조건부 조회
 <br>
 <!DOCTYPE html>
 <html>
@@ -67,6 +67,10 @@ background:#e8f7e8;
 background:#ffe6e6;
 }
 
+.action{
+background:#fff4cc;
+}
+
 .precise{
 color:red;
 font-weight:bold;
@@ -110,6 +114,44 @@ display:inline-flex;
 align-items:center;
 gap:6px;
 text-decoration:none;
+}
+
+.resultBadge{
+display:inline-block;
+padding:2px 10px;
+border-radius:999px;
+font-size:12px;
+font-weight:bold;
+border:1px solid rgba(0,0,0,0.08);
+vertical-align:middle;
+}
+
+.resultPass{
+background:#dff5e1;
+color:#166534;
+}
+
+.resultWarn{
+background:#fff3a6;
+color:#7a5a00;
+}
+
+.resultFail{
+background:#ffd9d9;
+color:#b00020;
+}
+
+.resultEtc{
+background:#eeeeee;
+color:#333;
+}
+
+.titleRow{
+display:flex;
+align-items:center;
+gap:8px;
+flex-wrap:wrap;
+margin-bottom:6px;
 }
 </style>
 </head>
@@ -293,6 +335,52 @@ return '<span class="redbold">시간미정</span>';
 return escapeHtml(s);
 }
 
+function normalizeResultText(v){
+return String(v||"")
+.trim()
+.replace(/\s+/g," ")
+.replace(/\s*\(\s*/g,"(")
+.replace(/\s*\)\s*/g,")");
+}
+
+function isFieldActionStatus(v){
+return normalizeResultText(v)==="합격(현장조치)";
+}
+
+function isConditionalStatus(v){
+const s=normalizeResultText(v);
+return s==="불합격" || s==="조건부";
+}
+
+function isPassStatus(v){
+return normalizeResultText(v)==="합격";
+}
+
+function resultBadgeHtml(v){
+let s=normalizeResultText(v);
+if(!s) return "";
+
+if(isFieldActionStatus(s)){
+return `<span class="resultBadge resultWarn">현장조치</span>`;
+}
+if(isPassStatus(s)){
+return `<span class="resultBadge resultPass">합격</span>`;
+}
+if(s==="불합격"){
+return `<span class="resultBadge resultFail">불합격</span>`;
+}
+if(s==="조건부"){
+return `<span class="resultBadge resultFail">조건부</span>`;
+}
+return `<span class="resultBadge resultEtc">${escapeHtml(String(v||"").trim())}</span>`;
+}
+
+function getCardClass(resultValue){
+if(isFieldActionStatus(resultValue)) return "action";
+if(isConditionalStatus(resultValue)) return "warn";
+return "ok";
+}
+
 function openNaverMap(address){
 let addr=String(address||"").trim();
 if(!addr){
@@ -307,7 +395,6 @@ function updateAreaButtons(){
 document.querySelectorAll("button[id^='btn-']").forEach(btn=>{
 btn.classList.remove("active");
 });
-
 const activeBtn=document.getElementById("btn-"+currentArea);
 if(activeBtn) activeBtn.classList.add("active");
 }
@@ -320,7 +407,6 @@ fetch(BCSV).then(r=>r.text())
 let rowsB=parseCSV(b);
 
 rowsB.slice(1).forEach(c=>{
-
 let rawId=(c[1]||"").trim();
 let id=pad7(rawId);
 
@@ -330,6 +416,7 @@ nameNorm:normalizeSearch(c[0]||""),
 id:id,
 idNorm:normalizeSearch(id),
 address:c[9]||"",
+RESULT:c[36]||"",
 Y:c[26]||"",
 AA:c[28]||"",
 AC:c[30]||"",
@@ -428,10 +515,11 @@ return;
 
 areaData.forEach(item=>{
 
-let defect=defectDB[item.id]||"";
-let hasDefect=String(defect).trim()!=="";
 let db=dbById[item.id]||{};
+let defect=db.AN||"";
+let resultValue=db.RESULT||"";
 let address=db.address||"";
+let resultHtml=resultBadgeHtml(resultValue);
 
 let insuranceName=highlightStatusText(db.Y||"");
 let insuranceDateText=formatShortDate(db.AA||"");
@@ -465,7 +553,7 @@ detailParts.push(defectHtml);
 detailParts.push(`<div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(item.id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>`);
 
 let div=document.createElement("div");
-div.className="item "+(hasDefect?"warn":"ok");
+div.className="item "+getCardClass(resultValue);
 div.onclick=()=>toggle(div);
 
 let type=String(item.type||"");
@@ -475,11 +563,13 @@ type='<span class="precise">'+escapeHtml(type)+'</span>';
 type=escapeHtml(type);
 }
 
-let condition=hasDefect?" (조건부)":"";
 let timeHtml=formatTimeHtml(item.time);
 
 div.innerHTML=`
-<b>${escapeHtml(item.name)} ${escapeHtml(item.id)}${condition}</b><br>
+<div class="titleRow">
+  <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}</b>
+  ${resultHtml || ""}
+</div>
 ${formatDate(item.date)} / ${timeHtml} / ${type} / ${escapeHtml(item.area)}
 <div class="detail">${detailParts.join("<br><br>")}</div>
 `;
@@ -512,8 +602,12 @@ container.innerHTML="";
 
 result.forEach(r=>{
 
+let defect=r.AN||"";
+let resultValue=r.RESULT||"";
+let resultHtml=resultBadgeHtml(resultValue);
+
 let div=document.createElement("div");
-div.className="item ok";
+div.className="item "+getCardClass(resultValue);
 
 let yText=highlightStatusText(r.Y);
 let acText=highlightStatusText(r.AC);
@@ -536,17 +630,18 @@ let afHtml=afText
   : escapeHtml(afText))
 : "-";
 
-let defectHtml=formatDefect(escapeHtml(r.AN));
+let defectHtml=formatDefect(escapeHtml(defect));
 
 div.innerHTML=`
-<b>${escapeHtml(r.name)} ${escapeHtml(r.id)}</b><br><br>
+<div class="titleRow">
+  <b>${escapeHtml(r.name)} ${escapeHtml(r.id)}</b>
+  ${resultHtml || ""}
+</div>
 보험사 ${yText} : ${aaHtml}<br>
 안전관리자 ${acText} : ${afHtml}
-${String(r.AN||"").trim()!=="" ? `<br><br>${defectHtml}` : ``}
+${String(defect).trim()!=="" ? `<br><br>${defectHtml}` : ``}
 <br><br><div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(r.id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>
 `;
-
-div.innerHTML=div.innerHTML.replace(/조건부/g,'<span class="red">조건부</span>');
 
 let mapBtn=div.querySelector(".mapBtn");
 if(mapBtn){
