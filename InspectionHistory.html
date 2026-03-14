@@ -345,13 +345,13 @@ let lastDate3="";
 
 rowsA.forEach(c=>{
 
-let date=c[0]||lastDate1;
+let date1=c[0]||lastDate1;
 if(c[0]) lastDate1=c[0];
 
 if(c[3]){
 data.gangbuk.push({
 name:c[3],
-date:date,
+date:date1,
 time:c[1],
 type:c[2],
 area:c[4],
@@ -373,17 +373,6 @@ id:extract7(c[13]||"")
 });
 }
 
-/*
-경기 데이터가 들어올 자리 미리 확보
-필요 시 아래 인덱스만 실제 CSV 열에 맞게 조정하면 됨
-예시 구조:
-날짜: c[16]
-시간: c[17]
-검사종류: c[18]
-건물명: c[19]
-구역: c[20]
-정보센터링크: c[21]
-*/
 let date3=c[16]||lastDate3;
 if(c[16]) lastDate3=c[16];
 
