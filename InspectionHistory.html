@@ -15,12 +15,16 @@ margin:10px;
 button{
 padding:8px 14px;
 margin:4px;
-border:none;
+border:2px solid transparent;
 border-radius:6px;
 background:#444;
 color:white;
 font-weight:bold;
 cursor:pointer;
+}
+
+button.active{
+border-color:red;
 }
 
 #search{
@@ -112,8 +116,9 @@ text-decoration:none;
 
 <body>
 
-<button onclick="showArea('gangbuk')">강북</button>
-<button onclick="showArea('gangnam')">강남</button>
+<button id="btn-gangbuk" onclick="showArea('gangbuk')">강북</button>
+<button id="btn-gangnam" onclick="showArea('gangnam')">강남</button>
+<button id="btn-gyeonggi" onclick="showArea('gyeonggi')">경기</button>
 
 <input id="search" placeholder="건물명 / 승강기번호 검색">
 
@@ -126,7 +131,7 @@ const ACSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-Zyo
 const BCSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1183872898&single=true&output=csv";
 const NAVERMAP_ICON="https://www.darun.io/_next/image?url=https%3A%2F%2Fres.cloudinary.com%2Fdqddtkvmb%2Fimage%2Fupload%2Fv1715433300%2Fimages%2Flogos%2Fnavermap.png&w=256&q=75";
 
-let data={gangbuk:[],gangnam:[]};
+let data={gangbuk:[],gangnam:[],gyeonggi:[]};
 let dbRows=[];
 let defectDB={};
 let dbById={};
@@ -290,6 +295,15 @@ let encoded=encodeURIComponent(addr);
 location.href="nmap://search?query="+encoded+"&appname=naver_map";
 }
 
+function updateAreaButtons(){
+document.querySelectorAll("button[id^='btn-']").forEach(btn=>{
+btn.classList.remove("active");
+});
+
+const activeBtn=document.getElementById("btn-"+currentArea);
+if(activeBtn) activeBtn.classList.add("active");
+}
+
 Promise.all([
 fetch(ACSV).then(r=>r.text()),
 fetch(BCSV).then(r=>r.text())
@@ -327,6 +341,7 @@ let rowsA=parseCSV(a).slice(1);
 
 let lastDate1="";
 let lastDate2="";
+let lastDate3="";
 
 rowsA.forEach(c=>{
 
@@ -357,10 +372,36 @@ area:c[12],
 id:extract7(c[13]||"")
 });
 }
+
+/*
+경기 데이터가 들어올 자리 미리 확보
+필요 시 아래 인덱스만 실제 CSV 열에 맞게 조정하면 됨
+예시 구조:
+날짜: c[16]
+시간: c[17]
+검사종류: c[18]
+건물명: c[19]
+구역: c[20]
+정보센터링크: c[21]
+*/
+let date3=c[16]||lastDate3;
+if(c[16]) lastDate3=c[16];
+
+if(c[19]){
+data.gyeonggi.push({
+name:c[19],
+date:date3,
+time:c[17],
+type:c[18],
+area:c[20],
+id:extract7(c[21]||"")
+});
+}
 });
 
 sortData(data.gangbuk);
 sortData(data.gangnam);
+sortData(data.gyeonggi);
 
 renderArea();
 
@@ -371,14 +412,24 @@ console.error(err);
 
 function showArea(a){
 currentArea=a;
+updateAreaButtons();
 renderArea();
 }
 
 function renderArea(){
+updateAreaButtons();
+
 let container=document.getElementById("container");
 container.innerHTML="";
 
-data[currentArea].forEach(item=>{
+let areaData=data[currentArea]||[];
+
+if(areaData.length===0){
+container.innerHTML="데이터 없음";
+return;
+}
+
+areaData.forEach(item=>{
 
 let defect=defectDB[item.id]||"";
 let hasDefect=String(defect).trim()!=="";
@@ -546,6 +597,8 @@ s.appendChild(d);
 
 renderSearch(v);
 });
+
+updateAreaButtons();
 </script>
 
 </body>
