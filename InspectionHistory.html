@@ -285,6 +285,14 @@ return '<span class="redbold">🚨 '+escapeHtml(s)+'</span>';
 return escapeHtml(s);
 }
 
+function formatTimeHtml(t){
+let s=String(t||"").trim();
+if(s==="0:33"){
+return '<span class="redbold">시간미정</span>';
+}
+return escapeHtml(s);
+}
+
 function openNaverMap(address){
 let addr=String(address||"").trim();
 if(!addr){
@@ -468,10 +476,11 @@ type=escapeHtml(type);
 }
 
 let condition=hasDefect?" (조건부)":"";
+let timeHtml=formatTimeHtml(item.time);
 
 div.innerHTML=`
 <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}${condition}</b><br>
-${formatDate(item.date)} / ${escapeHtml(item.time)} / ${type} / ${escapeHtml(item.area)}
+${formatDate(item.date)} / ${timeHtml} / ${type} / ${escapeHtml(item.area)}
 <div class="detail">${detailParts.join("<br><br>")}</div>
 `;
 
