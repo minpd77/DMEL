@@ -1,32 +1,114 @@
-대명엘리베이터 현장 검사조건부 조회
-<br>
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<title>대명엘리베이터 현장 검사조건부 조회</title>
 
 <style>
-body{
-font-family:Arial;
+html,body{
+height:100%;
+margin:0;
+padding:0;
+font-family:Arial,sans-serif;
 background:#f5f5f5;
-margin:10px;
+overflow:hidden;
 }
-
+body{
+display:flex;
+flex-direction:column;
+}
+#app{
+height:100vh;
+display:flex;
+flex-direction:column;
+overflow:hidden;
+}
+#fixedTop{
+flex:0 0 auto;
+background:#f5f5f5;
+padding:10px 10px 8px;
+box-sizing:border-box;
+border-bottom:1px solid #ddd;
+position:relative;
+z-index:10;
+box-shadow:0 4px 14px rgba(0,0,0,0.16);
+}
+#titleRow{
+display:flex;
+align-items:center;
+justify-content:space-between;
+gap:10px;
+margin-bottom:8px;
+}
+#pageTitle{
+font-size:20px;
+font-weight:bold;
+line-height:1.2;
+}
+.titleBtns{
+display:flex;
+align-items:center;
+gap:8px;
+}
+#btn-refresh{
+background:#ffd400;
+color:#111;
+border:2px solid #b89b00;
+border-radius:8px;
+padding:8px 14px;
+font-weight:bold;
+cursor:pointer;
+flex:0 0 auto;
+}
+#btn-refresh:hover{
+filter:brightness(0.97);
+}
+.topBar{
+display:flex;
+align-items:center;
+flex-wrap:wrap;
+gap:4px;
+margin-bottom:6px;
+}
 button{
 padding:8px 14px;
 margin:4px;
 border:2px solid transparent;
 border-radius:6px;
 background:#444;
-color:white;
+color:#fff;
 font-weight:bold;
 cursor:pointer;
 }
-
 button.active{
 border-color:red;
 }
-
+#btn-gyeonggi{
+margin-right:10px;
+}
+.modeBtn{
+background:#e8ddff;
+color:#4b2d7f;
+border-color:#cdb7ff;
+}
+.modeBtn.active{
+border-color:#7c4dff;
+background:#dccbff;
+color:#351b67;
+}
+#btn-today{
+display:none;
+background:#d8ecff;
+color:#164a7a;
+border:2px solid #a9d2ff;
+}
+#btn-today:hover{
+filter:brightness(0.98);
+}
+.searchWrap{
+position:relative;
+}
 #search{
 width:100%;
 padding:10px;
@@ -34,48 +116,54 @@ font-size:16px;
 border-radius:8px;
 border:1px solid #ccc;
 margin-top:6px;
+box-sizing:border-box;
 }
-
 #suggest{
-background:white;
+position:absolute;
+left:0;
+right:0;
+top:calc(100% + 3px);
+background:#fff;
 border-radius:8px;
-margin-top:3px;
+max-height:108px;
+overflow-y:auto;
+box-shadow:0 8px 18px rgba(0,0,0,0.16);
+z-index:100;
+display:none;
 }
-
 .sitem{
-padding:8px;
+padding:8px 10px;
 cursor:pointer;
+min-height:36px;
+box-sizing:border-box;
+display:flex;
+align-items:center;
 }
-
 .sitem:hover{
 background:#eee;
 }
-
+#listWrap{
+flex:1 1 auto;
+min-height:0;
+overflow-y:auto;
+padding:10px;
+box-sizing:border-box;
+}
 .item{
 padding:12px;
 margin-bottom:10px;
 border-radius:10px;
 box-shadow:0 2px 5px rgba(0,0,0,0.1);
 cursor:pointer;
+background:#fff;
 }
-
-.ok{
-background:#e8f7e8;
-}
-
-.warn{
-background:#ffe6e6;
-}
-
-.action{
-background:#fff4cc;
-}
-
+.ok{ background:#e8f7e8; }
+.warn{ background:#ffe6e6; }
+.action{ background:#fff4cc; }
 .precise{
 color:red;
 font-weight:bold;
 }
-
 .detail{
 display:none;
 margin-top:10px;
@@ -83,16 +171,10 @@ white-space:pre-line;
 font-size:14px;
 line-height:1.5;
 }
-
-.red{
-color:red;
-}
-
 .redbold{
 color:red;
 font-weight:bold;
 }
-
 .linkRow{
 display:flex;
 align-items:center;
@@ -100,7 +182,6 @@ gap:12px;
 flex-wrap:wrap;
 margin-top:0;
 }
-
 .mapIcon{
 width:22px;
 height:22px;
@@ -108,14 +189,12 @@ vertical-align:middle;
 cursor:pointer;
 display:block;
 }
-
 .mapBtn{
 display:inline-flex;
 align-items:center;
 gap:6px;
 text-decoration:none;
 }
-
 .resultBadge{
 display:inline-block;
 padding:2px 10px;
@@ -125,26 +204,39 @@ font-weight:bold;
 border:1px solid rgba(0,0,0,0.08);
 vertical-align:middle;
 }
-
 .resultPass{
 background:#dff5e1;
 color:#166534;
 }
-
 .resultWarn{
 background:#fff3a6;
 color:#7a5a00;
 }
-
 .resultFail{
 background:#ffd9d9;
 color:#b00020;
 }
-
 .resultEtc{
-background:#eeeeee;
+background:#eee;
 color:#333;
 }
+.areaRound{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+min-width:28px;
+height:28px;
+padding:0 9px;
+border-radius:999px;
+font-size:12px;
+font-weight:bold;
+color:#fff;
+vertical-align:middle;
+}
+.areaRound.gangbuk{ background:#1e3a8a; }
+.areaRound.gangnam{ background:#15803d; }
+.areaRound.gyeonggi{ background:#7c3aed; }
+.areaRound.etc{ background:#6b7280; }
 
 .titleRow{
 display:flex;
@@ -153,546 +245,1265 @@ gap:8px;
 flex-wrap:wrap;
 margin-bottom:6px;
 }
+#loadingOverlay{
+position:fixed;
+left:0;
+top:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.5);
+display:none;
+align-items:center;
+justify-content:center;
+z-index:99999;
+}
+#loadingText{
+color:#ffd400;
+font-size:28px;
+font-weight:bold;
+text-align:center;
+text-shadow:0 1px 2px rgba(0,0,0,0.5);
+padding:20px;
+}
+#container{
+min-height:100%;
+box-sizing:border-box;
+}
+.loadingHint{
+font-size:12px;
+color:#666;
+margin-top:4px;
+}
+.monthSection{
+background:#fff;
+border-radius:12px;
+padding:10px;
+margin-bottom:14px;
+box-shadow:0 2px 6px rgba(0,0,0,0.08);
+}
+.monthTitle{
+font-size:18px;
+font-weight:bold;
+margin-bottom:10px;
+}
+.monthWeekdays{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:6px;
+margin-bottom:6px;
+font-size:12px;
+font-weight:bold;
+color:#666;
+text-align:center;
+}
+.monthGrid{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:6px;
+}
+.dayCell,.dayCellEmpty{
+min-height:66px;
+border-radius:10px;
+padding:6px;
+box-sizing:border-box;
+}
+.dayCell{
+background:#f8f8f8;
+border:1px solid #e2e2e2;
+cursor:pointer;
+}
+.dayCell.selected{
+border:2px solid #ffb800;
+background:#fff8d8;
+}
+.dayCell.hasData{
+background:#eef6ff;
+}
+.dayCellNum{
+font-size:13px;
+font-weight:bold;
+margin-bottom:4px;
+}
+.dayCellAreaCounts{
+font-size:11px;
+line-height:1.3;
+display:flex;
+flex-direction:column;
+gap:3px;
+}
+.dayCellAreaCounts .areaRound{
+min-width:unset;
+height:18px;
+padding:0 6px;
+font-size:10px;
+margin-right:4px;
+}
+.dayCellEmpty{
+background:transparent;
+border:1px dashed transparent;
+}
+.dayScroller{
+display:flex;
+overflow-x:auto;
+gap:12px;
+-webkit-overflow-scrolling:touch;
+scroll-snap-type:x mandatory;
+padding-bottom:8px;
+}
+.dayPanel{
+min-width:88%;
+max-width:88%;
+background:#fff;
+border-radius:12px;
+padding:12px;
+box-sizing:border-box;
+box-shadow:0 2px 6px rgba(0,0,0,0.08);
+flex:0 0 auto;
+scroll-snap-align:start;
+}
+.dayPanelHead{
+font-size:18px;
+font-weight:bold;
+margin-bottom:10px;
+}
+.areaGroup{
+margin-top:10px;
+}
+.areaGroupTitle{
+display:inline-block;
+padding:4px 10px;
+border-radius:999px;
+font-size:12px;
+font-weight:bold;
+margin-bottom:6px;
+color:#fff;
+}
+.area-gangbuk{ background:#1e3a8a; }
+.area-gangnam{ background:#15803d; }
+.area-gyeonggi{ background:#7c3aed; }
+.area-etc{ background:#6b7280; }
+.emptyMini{
+font-size:13px;
+color:#888;
+padding:6px 0;
+}
+.smallHint{
+font-size:12px;
+color:#777;
+margin-top:2px;
+margin-bottom:8px;
+}
+.todayFocus{
+border:2px solid #e11d48 !important;
+box-shadow:0 0 0 1px rgba(225,29,72,0.15);
+}
+@media (max-width: 480px){
+#pageTitle{ font-size:18px; }
+button{ padding:7px 11px; font-size:13px; }
+#loadingText{ font-size:24px; }
+#btn-refresh,#btn-today{ padding:7px 11px; font-size:13px; }
+}
 </style>
 </head>
 
 <body>
+<div id="app">
+  <div id="fixedTop">
+    <div id="titleRow">
+      <div id="pageTitle">대명엘리베이터 현장 검사조건부 조회</div>
+      <div class="titleBtns">
+        <button id="btn-refresh" onclick="reloadData()">새로고침</button>
+      </div>
+    </div>
 
-<button id="btn-gangbuk" onclick="showArea('gangbuk')">강북</button>
-<button id="btn-gangnam" onclick="showArea('gangnam')">강남</button>
-<button id="btn-gyeonggi" onclick="showArea('gyeonggi')">경기</button>
+    <div class="topBar">
+      <button id="btn-gangbuk" onclick="showArea('gangbuk')">강북</button>
+      <button id="btn-gangnam" onclick="showArea('gangnam')">강남</button>
+      <button id="btn-gyeonggi" onclick="showArea('gyeonggi')">경기</button>
 
-<input id="search" placeholder="건물명 / 승강기번호 검색">
+      <button id="btn-month" class="modeBtn" onclick="showCalendarMode('month')">월간</button>
+      <button id="btn-day" class="modeBtn" onclick="showCalendarMode('day')">일간</button>
+      <button id="btn-today" onclick="goToday()">오늘</button>
+    </div>
 
-<div id="suggest"></div>
+    <div class="searchWrap">
+      <input id="search" placeholder="건물명 / 승강기번호 검색">
+      <div id="suggest"></div>
+    </div>
+    <div id="cacheHint" class="loadingHint"></div>
+  </div>
 
-<div id="container">로딩중...</div>
+  <div id="listWrap">
+    <div id="container">로딩중...</div>
+  </div>
+</div>
+
+<div id="loadingOverlay">
+  <div id="loadingText">데이터 로딩중....</div>
+</div>
 
 <script>
 const ACSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1134037580&single=true&output=csv";
 const BCSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1183872898&single=true&output=csv";
 const NAVERMAP_ICON="https://www.darun.io/_next/image?url=https%3A%2F%2Fres.cloudinary.com%2Fdqddtkvmb%2Fimage%2Fupload%2Fv1715433300%2Fimages%2Flogos%2Fnavermap.png&w=256&q=75";
 
+const CACHE_KEY="dm_elevator_cache_v3";
+const CACHE_TTL_MS=5*60*1000;
+
+const $container=document.getElementById("container");
+const $suggest=document.getElementById("suggest");
+const $search=document.getElementById("search");
+const $listWrap=document.getElementById("listWrap");
+const $overlay=document.getElementById("loadingOverlay");
+const $cacheHint=document.getElementById("cacheHint");
+const $btnToday=document.getElementById("btn-today");
+
 let data={gangbuk:[],gangnam:[],gyeonggi:[]};
 let dbRows=[];
-let defectDB={};
 let dbById={};
 let keywordList=[];
+let calendarItems=[];
+let calendarCounts={};
 let currentArea="gangbuk";
+let currentMode="area";
+let selectedDate="";
+
+let dayStartOffset = -5;
+let dayEndOffset = 5;
+let monthStartOffset = 0;
+let monthEndOffset = 4;
+
+function showLoading(){ $overlay.style.display="flex"; }
+function hideLoading(){ $overlay.style.display="none"; }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function fetchTextWithRetry(url,retries=3,delay=700){
+  let lastError;
+  for(let i=1;i<=retries;i++){
+    try{
+      const res=await fetch(url,{cache:"no-store"});
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const text=await res.text();
+      if(!String(text||"").trim()) throw new Error("빈 응답");
+      return text;
+    }catch(err){
+      lastError=err;
+      if(i<retries) await sleep(delay);
+    }
+  }
+  throw lastError || new Error("불러오기 실패");
+}
 
 function parseCSV(text){
-let rows=[];
-let row=[];
-let cell="";
-let inQuotes=false;
+  const rows=[];
+  let curRow=[], cell="", inQuotes=false;
+  text=String(text||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
 
-text=String(text||"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  for(let i=0;i<text.length;i++){
+    const ch=text[i], next=text[i+1];
+    if(ch==='"'){
+      if(inQuotes && next==='"'){ cell+='"'; i++; }
+      else inQuotes=!inQuotes;
+    }else if(ch==="," && !inQuotes){
+      curRow.push(cell); cell="";
+    }else if(ch==="\n" && !inQuotes){
+      curRow.push(cell);
+      rows.push(curRow);
+      curRow=[]; cell="";
+    }else{
+      cell+=ch;
+    }
+  }
+  curRow.push(cell);
+  rows.push(curRow);
 
-for(let i=0;i<text.length;i++){
-let ch=text[i];
-let next=text[i+1];
-
-if(ch === '"'){
-if(inQuotes && next === '"'){
-cell += '"';
-i++;
-}else{
-inQuotes = !inQuotes;
-}
-}else if(ch === "," && !inQuotes){
-row.push(cell);
-cell="";
-}else if(ch === "\n" && !inQuotes){
-row.push(cell);
-rows.push(row);
-row=[];
-cell="";
-}else{
-cell += ch;
-}
+  return rows
+    .filter(r=>!(r.length===1 && String(r[0]).trim()===""))
+    .map(r=>r.map(v=>String(v||"").trim()));
 }
 
-row.push(cell);
-rows.push(row);
-
-return rows
-.filter(r=>!(r.length===1 && String(r[0]).trim()===""))
-.map(r=>r.map(v=>String(v||"").trim()));
-}
-
-function pad7(n){
-return String(n||"").padStart(7,"0");
-}
+function pad7(v){ return String(v||"").padStart(7,"0"); }
 
 function extract7(link){
-if(!link) return "";
-let m=String(link).match(/\d+/g);
-if(!m) return "";
-return pad7(m[m.length-1]);
+  const m=String(link||"").match(/\d+/g);
+  return m ? pad7(m[m.length-1]) : "";
 }
 
-function today(){
-let d=new Date();
-return d.toISOString().slice(0,10).replace(/-/g,"");
+function normalizeDateDigits(v){
+  return String(v||"").replace(/[^\d]/g,"").trim();
 }
 
-function normalizeDateDigits(d){
-return String(d||"").replace(/[^\d]/g,"").trim();
+function dateToYMD(date){
+  const y=date.getFullYear();
+  const m=String(date.getMonth()+1).padStart(2,"0");
+  const d=String(date.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
 }
 
-function isExpired(d){
-if(!d) return false;
-let v=normalizeDateDigits(d);
-return /^\d{8}$/.test(v) && v<today();
+function ymdToDate(ymd){
+  const m=String(ymd||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return null;
+  return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
 }
 
-function formatDate(d){
-if(!d) return "";
-let s=String(d).trim();
-let onlyNum=normalizeDateDigits(s);
+function normalizeScheduleDateToYMD(v){
+  const s=String(v||"").trim();
+  if(!s) return "";
+  const digits=s.replace(/[^\d]/g,"");
 
-if(/^\d{8}$/.test(onlyNum)){
-if(onlyNum.startsWith("20")){
-return onlyNum.slice(0,4)+"-"+onlyNum.slice(4,6)+"-"+onlyNum.slice(6,8);
-}else{
-return onlyNum.slice(0,2)+"-"+onlyNum.slice(2,4)+"-"+onlyNum.slice(4,6);
-}
-}
+  if(/^\d{8}$/.test(digits)){
+    if(digits.startsWith("20")) return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
+    return `20${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4,6)}`;
+  }
+  if(/^\d{6}$/.test(digits)) return `20${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4,6)}`;
 
-if(/^\d{6}$/.test(onlyNum)){
-return onlyNum.slice(0,2)+"-"+onlyNum.slice(2,4)+"-"+onlyNum.slice(4,6);
-}
+  const m=s.match(/^(\d{2,4})-(\d{2})-(\d{2})$/);
+  if(m){
+    const y=m[1].length===2 ? `20${m[1]}` : m[1];
+    return `${y}-${m[2]}-${m[3]}`;
+  }
 
-let date=new Date(s);
-if(isNaN(date)) return s;
-
-let yyyy=date.getFullYear();
-let mm=String(date.getMonth()+1).padStart(2,"0");
-let dd=String(date.getDate()).padStart(2,"0");
-return yyyy+"-"+mm+"-"+dd;
+  const d=new Date(s);
+  return isNaN(d) ? "" : dateToYMD(d);
 }
 
-function formatShortDate(d){
-let full=formatDate(d);
-let m=String(full).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-if(m) return m[1].slice(2)+"-"+m[2]+"-"+m[3];
-return full;
+function getBaseWorkday(date=new Date()){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const day=d.getDay();
+  if(day===6) d.setDate(d.getDate()+2);
+  if(day===0) d.setDate(d.getDate()+1);
+  return d;
+}
+
+function addBusinessDays(date, offset){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  if(offset===0){
+    while(d.getDay()===0 || d.getDay()===6) d.setDate(d.getDate()+1);
+    return d;
+  }
+  const step = offset>0 ? 1 : -1;
+  let remain = Math.abs(offset);
+  while(remain>0){
+    d.setDate(d.getDate()+step);
+    if(d.getDay()!==0 && d.getDay()!==6) remain--;
+  }
+  return d;
+}
+
+function todayYMD(){ return dateToYMD(new Date()); }
+function baseWorkdayYMD(){ return dateToYMD(getBaseWorkday()); }
+
+function isExpired(v){
+  const d=normalizeDateDigits(v);
+  return /^\d{8}$/.test(d) && d<todayYMD().replace(/-/g,"");
+}
+
+function formatDate(v){
+  if(!v) return "";
+  const s=String(v).trim();
+  const n=normalizeDateDigits(s);
+
+  if(/^\d{8}$/.test(n)){
+    if(n.startsWith("20")) return `${n.slice(0,4)}-${n.slice(4,6)}-${n.slice(6,8)}`;
+    return `${n.slice(0,2)}-${n.slice(2,4)}-${n.slice(4,6)}`;
+  }
+  if(/^\d{6}$/.test(n)) return `${n.slice(0,2)}-${n.slice(2,4)}-${n.slice(4,6)}`;
+
+  const d=new Date(s);
+  return isNaN(d) ? s : dateToYMD(d);
+}
+
+function formatShortDate(v){
+  const f=formatDate(v);
+  const m=f.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[1].slice(2)}-${m[2]}-${m[3]}` : f;
+}
+
+function formatMonthLabel(date){
+  return `${date.getFullYear()}년 ${date.getMonth()+1}월`;
+}
+
+function weekdayKor(date){
+  return ["일","월","화","수","목","금","토"][date.getDay()];
+}
+
+function formatDayPanelHead(date){
+  return `${date.getDate()}${weekdayKor(date)}`;
 }
 
 function escapeHtml(s){
-return String(s||"")
-.replace(/&/g,"&amp;")
-.replace(/</g,"&lt;")
-.replace(/>/g,"&gt;")
-.replace(/"/g,"&quot;")
-.replace(/'/g,"&#39;");
-}
-
-function formatDefect(t){
-if(!t) return "";
-return String(t).replace(/(\d+\))/g,"<br>$1").replace(/^<br>/,"");
-}
-
-function toggle(el){
-let d=el.querySelector(".detail");
-if(!d) return;
-d.style.display=d.style.display=="block"?"none":"block";
-}
-
-function sortData(arr){
-arr.sort((a,b)=>{
-let da=new Date((a.date||"")+" "+(a.time||""));
-let db=new Date((b.date||"")+" "+(b.time||""));
-return da-db;
-});
+  return String(s||"")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
 }
 
 function normalizeSearch(v){
-return String(v||"")
-.toLowerCase()
-.replace(/\s+/g,"")
-.trim();
+  return String(v||"").toLowerCase().replace(/\s+/g,"").trim();
 }
 
 function includesNormalized(target,query){
-return normalizeSearch(target).includes(normalizeSearch(query));
+  return normalizeSearch(target).includes(normalizeSearch(query));
+}
+
+/* 연관검색어는 이름+괄호를 유지하고 끝 7자리 번호만 제거 */
+function getSuggestSortKey(v){
+  const s=String(v||"").trim();
+  let base=s.replace(/\s+\d{7}\s*$/,"").trim();
+  return base.replace(/\s+/g,"");
+}
+
+/* 검색결과 카드 정렬도 이름 기준, 승강기번호 제외 */
+function getResultSortKey(row){
+  return String(row?.name||"").trim().replace(/\s+/g,"");
+}
+
+function formatDefect(v){
+  if(!v) return "";
+  return String(v).replace(/(\d+\))/g,"<br>$1").replace(/^<br>/,"");
 }
 
 function highlightStatusText(v){
-let s=String(v||"").trim();
-if(!s) return "-";
-if(/미가입|미선임/.test(s)){
-return '<span class="redbold">🚨 '+escapeHtml(s)+'</span>';
-}
-return escapeHtml(s);
+  const s=String(v||"").trim();
+  if(!s) return "-";
+  if(/미가입|미선임/.test(s)) return `<span class="redbold">🚨 ${escapeHtml(s)}</span>`;
+  return escapeHtml(s);
 }
 
-function formatTimeHtml(t){
-let s=String(t||"").trim();
-if(s==="0:33"){
-return '<span class="redbold">시간미정</span>';
-}
-return escapeHtml(s);
+function formatTimeHtml(v){
+  const s=String(v||"").trim();
+  return s==="0:33" ? '<span class="redbold">시간미정</span>' : escapeHtml(s);
 }
 
 function normalizeResultText(v){
-return String(v||"")
-.trim()
-.replace(/\s+/g," ")
-.replace(/\s*\(\s*/g,"(")
-.replace(/\s*\)\s*/g,")");
+  return String(v||"").trim().replace(/\s+/g," ").replace(/\s*\(\s*/g,"(").replace(/\s*\)\s*/g,")");
 }
 
-function isFieldActionStatus(v){
-return normalizeResultText(v)==="합격(현장조치)";
-}
-
-function isConditionalStatus(v){
-const s=normalizeResultText(v);
-return s==="불합격" || s==="조건부";
-}
-
-function isPassStatus(v){
-return normalizeResultText(v)==="합격";
-}
+function isFieldActionStatus(v){ return normalizeResultText(v)==="합격(현장조치)"; }
+function isConditionalStatus(v){ const s=normalizeResultText(v); return s==="불합격" || s==="조건부"; }
+function isPassStatus(v){ return normalizeResultText(v)==="합격"; }
 
 function resultBadgeHtml(v){
-let s=normalizeResultText(v);
-if(!s) return "";
-
-if(isFieldActionStatus(s)){
-return `<span class="resultBadge resultWarn">현장조치</span>`;
-}
-if(isPassStatus(s)){
-return `<span class="resultBadge resultPass">합격</span>`;
-}
-if(s==="불합격"){
-return `<span class="resultBadge resultFail">불합격</span>`;
-}
-if(s==="조건부"){
-return `<span class="resultBadge resultFail">조건부</span>`;
-}
-return `<span class="resultBadge resultEtc">${escapeHtml(String(v||"").trim())}</span>`;
+  const s=normalizeResultText(v);
+  if(!s) return "";
+  if(isFieldActionStatus(s)) return `<span class="resultBadge resultWarn">현장조치</span>`;
+  if(isPassStatus(s)) return `<span class="resultBadge resultPass">합격</span>`;
+  if(s==="불합격") return `<span class="resultBadge resultFail">불합격</span>`;
+  if(s==="조건부") return `<span class="resultBadge resultFail">조건부</span>`;
+  return `<span class="resultBadge resultEtc">${escapeHtml(String(v||"").trim())}</span>`;
 }
 
-function getCardClass(resultValue){
-if(isFieldActionStatus(resultValue)) return "action";
-if(isConditionalStatus(resultValue)) return "warn";
-return "ok";
+function areaRoundBadgeHtml(area){
+  const a=normalizeAreaLabel(area);
+  if(a==="강북") return `<span class="areaRound gangbuk">강북</span>`;
+  if(a==="강남") return `<span class="areaRound gangnam">강남</span>`;
+  if(a==="경기") return `<span class="areaRound gyeonggi">경기</span>`;
+  return `<span class="areaRound etc">${escapeHtml(a)}</span>`;
+}
+
+function getCardClass(v){
+  if(isFieldActionStatus(v)) return "action";
+  if(isConditionalStatus(v)) return "warn";
+  return "ok";
 }
 
 function openNaverMap(address){
-let addr=String(address||"").trim();
-if(!addr){
-alert("주소가 없습니다.");
-return;
-}
-let encoded=encodeURIComponent(addr);
-location.href="nmap://search?query="+encoded+"&appname=naver_map";
+  const addr=String(address||"").trim();
+  if(!addr){ alert("주소가 없습니다."); return; }
+  location.href="nmap://search?query="+encodeURIComponent(addr)+"&appname=naver_map";
 }
 
-function updateAreaButtons(){
-document.querySelectorAll("button[id^='btn-']").forEach(btn=>{
-btn.classList.remove("active");
-});
-const activeBtn=document.getElementById("btn-"+currentArea);
-if(activeBtn) activeBtn.classList.add("active");
+function normalizeAreaLabel(v){
+  const s=String(v||"").trim();
+  if(/강북/.test(s)) return "강북";
+  if(/강남/.test(s)) return "강남";
+  if(/경기/.test(s)) return "경기";
+  return s || "기타";
 }
 
-Promise.all([
-fetch(ACSV).then(r=>r.text()),
-fetch(BCSV).then(r=>r.text())
-]).then(([a,b])=>{
-
-let rowsB=parseCSV(b);
-
-rowsB.slice(1).forEach(c=>{
-let rawId=(c[1]||"").trim();
-let id=pad7(rawId);
-
-let row={
-name:c[0]||"",
-nameNorm:normalizeSearch(c[0]||""),
-id:id,
-idNorm:normalizeSearch(id),
-address:c[9]||"",
-RESULT:c[36]||"",
-Y:c[26]||"",
-AA:c[28]||"",
-AC:c[30]||"",
-AF:c[33]||"",
-AN:c[39]||""
-};
-
-dbRows.push(row);
-defectDB[id]=row.AN;
-dbById[id]=row;
-
-if(row.name) keywordList.push(row.name);
-if(/^\d+$/.test(rawId)) keywordList.push(pad7(rawId));
-});
-
-let rowsA=parseCSV(a).slice(1);
-
-let lastDate1="";
-let lastDate2="";
-let lastDate3="";
-
-rowsA.forEach(c=>{
-
-let date1=c[0]||lastDate1;
-if(c[0]) lastDate1=c[0];
-
-if(c[3]){
-data.gangbuk.push({
-name:c[3],
-date:date1,
-time:c[1],
-type:c[2],
-area:c[4],
-id:extract7(c[5]||"")
-});
+function areaClass(area){
+  if(area==="강북") return "area-gangbuk";
+  if(area==="강남") return "area-gangnam";
+  if(area==="경기") return "area-gyeonggi";
+  return "area-etc";
 }
 
-let date2=c[8]||lastDate2;
-if(c[8]) lastDate2=c[8];
-
-if(c[11]){
-data.gangnam.push({
-name:c[11],
-date:date2,
-time:c[9],
-type:c[10],
-area:c[12],
-id:extract7(c[13]||"")
-});
+function areaOrder(area){
+  if(area==="강북") return 1;
+  if(area==="강남") return 2;
+  if(area==="경기") return 3;
+  return 9;
 }
 
-let date3=c[16]||lastDate3;
-if(c[16]) lastDate3=c[16];
-
-if(c[19]){
-data.gyeonggi.push({
-name:c[19],
-date:date3,
-time:c[17],
-type:c[18],
-area:c[20],
-id:extract7(c[21]||"")
-});
+function parseTimeValue(t){
+  const s=String(t||"").trim();
+  const m=s.match(/^(\d{1,2}):(\d{2})$/);
+  return m ? Number(m[1])*60 + Number(m[2]) : 99999;
 }
-});
 
-sortData(data.gangbuk);
-sortData(data.gangnam);
-sortData(data.gyeonggi);
+function sortItemsByAreaDateTime(arr){
+  return [...arr].sort((a,b)=>{
+    const ao=areaOrder(a.areaLabel)-areaOrder(b.areaLabel);
+    if(ao!==0) return ao;
+    if(String(a.date)!==String(b.date)) return String(a.date).localeCompare(String(b.date));
+    const ah=parseTimeValue(a.time), bh=parseTimeValue(b.time);
+    if(ah!==bh) return ah-bh;
+    return String(a.name||"").localeCompare(String(b.name||""),"ko",{numeric:true,sensitivity:"base"});
+  });
+}
 
-renderArea();
+function sortItemsByDateTime(arr){
+  return [...arr].sort((a,b)=>{
+    if(String(a.date)!==String(b.date)) return String(a.date).localeCompare(String(b.date));
+    const ah=parseTimeValue(a.time), bh=parseTimeValue(b.time);
+    if(ah!==bh) return ah-bh;
+    return String(a.name||"").localeCompare(String(b.name||""),"ko",{numeric:true,sensitivity:"base"});
+  });
+}
 
-}).catch(err=>{
-document.getElementById("container").innerHTML="데이터 불러오기 오류";
-console.error(err);
-});
+function updateButtons(){
+  document.querySelectorAll("button[id^='btn-']").forEach(btn=>{
+    if(btn.id!=="btn-refresh") btn.classList.remove("active");
+  });
+  if(currentMode==="area"){
+    const btn=document.getElementById("btn-"+currentArea);
+    if(btn) btn.classList.add("active");
+  }else{
+    const btn=document.getElementById("btn-"+currentMode);
+    if(btn) btn.classList.add("active");
+  }
+  $btnToday.style.display = currentMode==="area" ? "none" : "inline-block";
+}
 
-function showArea(a){
-currentArea=a;
-updateAreaButtons();
-renderArea();
+function sortData(arr){
+  arr.sort((a,b)=>{
+    const da=new Date((a.date||"")+" "+(a.time||""));
+    const db=new Date((b.date||"")+" "+(b.time||""));
+    return da-db;
+  });
+}
+
+function makeDateHtml(text,expired,isShort){
+  const v=isShort ? formatShortDate(text) : formatDate(text);
+  if(!v) return "-";
+  return expired ? `<span class="redbold">${escapeHtml(v)}</span> 🚨` : escapeHtml(v);
+}
+
+function makeDetailHtml(id,address,insuranceName,insuranceDateHtml,managerName,managerDateHtml,defect){
+  let html=`보험사 ${insuranceName} : ${insuranceDateHtml}<br>안전관리자 ${managerName} : ${managerDateHtml}`;
+  if(String(defect).trim()!=="") html += `<br><br>${formatDefect(escapeHtml(defect))}`;
+  html += `<br><br><div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" data-address="${escapeHtml(address)}" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>`;
+  return html;
+}
+
+function makeAreaCardHtml(item){
+  const db=dbById[item.id]||{};
+  const defect=db.AN||"";
+  const resultValue=db.RESULT||"";
+  const insuranceName=highlightStatusText(db.Y||"");
+  const managerName=highlightStatusText(db.AC||"");
+  const insuranceDateHtml=makeDateHtml(db.AA,isExpired(db.AA),true);
+  const managerDateHtml=makeDateHtml(db.AF,isExpired(db.AF),false);
+  const resultHtml=resultBadgeHtml(resultValue);
+
+  let type=String(item.type||"");
+  type=type.includes("정밀") ? `<span class="precise">${escapeHtml(type)}</span>` : escapeHtml(type);
+
+  return `
+<div class="item ${getCardClass(resultValue)}">
+  <div class="titleRow">
+    <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}</b>
+    ${resultHtml}
+  </div>
+  ${formatDate(item.date)} / ${formatTimeHtml(item.time)} / ${type} / ${escapeHtml(item.area)}
+  <div class="detail">${makeDetailHtml(item.id,db.address||"",insuranceName,insuranceDateHtml,managerName,managerDateHtml,defect)}</div>
+</div>`;
+}
+
+function makeSearchCardHtml(r){
+  const defect=r.AN||"";
+  const resultValue=r.RESULT||"";
+  const resultHtml=resultBadgeHtml(resultValue);
+  const insuranceName=highlightStatusText(r.Y);
+  const managerName=highlightStatusText(r.AC);
+  const insuranceDateHtml=makeDateHtml(r.AA,isExpired(r.AA),true);
+  const managerDateHtml=makeDateHtml(r.AF,isExpired(r.AF),false);
+  const areaBadge = areaRoundBadgeHtml(r.areaGroup || "");
+
+  let detail=`보험사 ${insuranceName} : ${insuranceDateHtml}<br>안전관리자 ${managerName} : ${managerDateHtml}`;
+  if(String(defect).trim()!=="") detail += `<br><br>${formatDefect(escapeHtml(defect))}`;
+  detail += `<br><br><div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(r.id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" data-address="${escapeHtml(r.address||"")}" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>`;
+
+  return `
+<div class="item ${getCardClass(resultValue)}">
+  <div class="titleRow">
+    <b>${escapeHtml(r.name)} ${escapeHtml(r.id)}</b>
+    ${resultHtml}
+    ${areaBadge}
+  </div>
+  <div class="detail">${detail}</div>
+</div>`;
+}
+
+function bindAreaContainerEvents(){
+  $container.querySelectorAll(".item").forEach(item=>{
+    item.addEventListener("click",function(){
+      const d=this.querySelector(".detail");
+      if(d) d.style.display=d.style.display==="block" ? "none" : "block";
+    });
+  });
+  $container.querySelectorAll(".mapBtn").forEach(btn=>{
+    btn.addEventListener("click",function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      openNaverMap(this.dataset.address||"");
+    });
+  });
+}
+
+function getItemsByDate(ymd){
+  return calendarItems.filter(v=>v.date===ymd);
+}
+function getItemsFromDate(ymd){
+  return calendarItems.filter(v=>String(v.date)>=String(ymd));
+}
+function buildCalendarCounts(){
+  calendarCounts={};
+  for(const item of calendarItems){
+    calendarCounts[item.date]=(calendarCounts[item.date]||0)+1;
+  }
+}
+
+function getMonthCellAreaCountHtml(ymd){
+  const items=getItemsByDate(ymd);
+  if(!items.length) return "";
+
+  const counts={강북:0, 강남:0, 경기:0};
+  items.forEach(item=>{
+    const area=normalizeAreaLabel(item.areaLabel);
+    if(counts.hasOwnProperty(area)) counts[area]++;
+  });
+
+  const lines=[];
+  if(counts["강북"]>0) lines.push(`<div><span class="areaRound gangbuk">강북</span> ${counts["강북"]}</div>`);
+  if(counts["강남"]>0) lines.push(`<div><span class="areaRound gangnam">강남</span> ${counts["강남"]}</div>`);
+  if(counts["경기"]>0) lines.push(`<div><span class="areaRound gyeonggi">경기</span> ${counts["경기"]}</div>`);
+
+  return lines.join("");
+}
+
+function makeCalendarCardHtml(item){
+  const areaText=item.areaDetail || item.areaLabel || "";
+  return makeAreaCardHtml({
+    name:item.name||"",
+    id:item.id||"",
+    date:item.date||"",
+    time:item.time||"",
+    type:item.type||"",
+    area:areaText,
+    source:item.source||"A"
+  });
+}
+
+function makeGroupedCardsHtml(items){
+  const sorted=sortItemsByAreaDateTime(items);
+  if(!sorted.length) return `<div class="emptyMini">해당 일정 없음</div>`;
+
+  const areaNames=["강북","강남","경기"];
+  let html="";
+
+  for(const area of areaNames){
+    const group=sorted.filter(v=>v.areaLabel===area);
+    if(!group.length) continue;
+    html+=`
+<div class="areaGroup">
+  <div class="areaGroupTitle ${areaClass(area)}">${escapeHtml(area)}</div>
+  ${group.map(makeCalendarCardHtml).join("")}
+</div>`;
+  }
+
+  const etc=sorted.filter(v=>!areaNames.includes(v.areaLabel));
+  if(etc.length){
+    html+=`
+<div class="areaGroup">
+  <div class="areaGroupTitle area-etc">기타</div>
+  ${etc.map(makeCalendarCardHtml).join("")}
+</div>`;
+  }
+
+  return html;
+}
+
+function getMonthBusinessGrid(year, month){
+  const lastDate=new Date(year,month+1,0).getDate();
+  const weekRows=[];
+  let currentWeek=new Array(5).fill(null);
+
+  for(let d=1; d<=lastDate; d++){
+    const cur=new Date(year,month,d);
+    const day=cur.getDay();
+    if(day===0 || day===6) continue;
+
+    const idx=day-1;
+    currentWeek[idx]=new Date(cur);
+
+    const next=new Date(year,month,d+1);
+    const isWeekEnd = d===lastDate || next.getDay()===6 || next.getDay()===0 || next.getMonth()!==month;
+    if(isWeekEnd){
+      weekRows.push(currentWeek);
+      currentWeek=new Array(5).fill(null);
+    }
+  }
+  if(currentWeek.some(Boolean)) weekRows.push(currentWeek);
+  return weekRows;
+}
+
+function renderMonthView(reset=true){
+  updateButtons();
+  const baseYMD=baseWorkdayYMD();
+  const baseDate=ymdToDate(baseYMD) || getBaseWorkday();
+
+  if(reset){
+    monthStartOffset = 0;
+    monthEndOffset = 4;
+    if(!selectedDate || currentMode==="month") selectedDate = baseYMD;
+    $listWrap.onscroll = null;
+  }
+
+  $container.innerHTML=`
+<div class="smallHint">주말 제외 · 오늘 기준월부터 표시 · 이전월로 스크롤하면 5개월씩 더 불러옵니다. 날짜를 누르면 일간으로 이동합니다.</div>
+<div id="monthWrap"></div>
+<div class="monthSection todayFocus">
+  <div class="monthTitle">오늘부터 일정</div>
+  ${makeGroupedCardsHtml(getItemsFromDate(baseYMD))}
+</div>`;
+
+  renderMonthBlocks(baseDate);
+  bindMonthEvents();
+  bindAreaContainerEvents();
+  bindMonthInfinite(baseDate);
+}
+
+function renderMonthBlocks(baseDate){
+  const wrap=document.getElementById("monthWrap");
+  if(!wrap) return;
+  let html="";
+  for(let offset=monthStartOffset; offset<=monthEndOffset; offset++){
+    const monthDate=new Date(baseDate.getFullYear(), baseDate.getMonth()+offset, 1);
+    html += makeMonthSectionHtml(monthDate, baseWorkdayYMD());
+  }
+  wrap.innerHTML=html;
+}
+
+function makeMonthSectionHtml(monthDate, baseYMD){
+  const year=monthDate.getFullYear();
+  const month=monthDate.getMonth();
+  const rows=getMonthBusinessGrid(year, month);
+
+  const cellsHtml = rows.map(week=>{
+    return week.map(dateObj=>{
+      if(!dateObj) return `<div class="dayCellEmpty"></div>`;
+      const ymd=dateToYMD(dateObj);
+      const count=calendarCounts[ymd]||0;
+      const isSelected=ymd===selectedDate ? " selected" : "";
+      const hasData=count>0 ? " hasData" : "";
+      const isTodayFocus=ymd===baseYMD ? " todayFocus" : "";
+      const areaCountHtml=getMonthCellAreaCountHtml(ymd);
+
+      return `
+<div class="dayCell${isSelected}${hasData}${isTodayFocus}" data-date="${ymd}">
+  <div class="dayCellNum">${dateObj.getDate()}</div>
+  <div class="dayCellAreaCounts">${areaCountHtml}</div>
+</div>`;
+    }).join("");
+  }).join("");
+
+  return `
+<div class="monthSection" data-month="${year}-${String(month+1).padStart(2,"0")}">
+  <div class="monthTitle">${formatMonthLabel(monthDate)}</div>
+  <div class="monthWeekdays">
+    <div>월</div><div>화</div><div>수</div><div>목</div><div>금</div>
+  </div>
+  <div class="monthGrid">${cellsHtml}</div>
+</div>`;
+}
+
+function bindMonthEvents(){
+  $container.querySelectorAll(".dayCell").forEach(cell=>{
+    cell.addEventListener("click",()=>{
+      selectedDate = cell.dataset.date;
+      currentMode = "day";
+      updateButtons();
+      renderDayView(false);
+      $listWrap.scrollTop = 0;
+    });
+  });
+}
+
+function bindMonthInfinite(baseDate){
+  let loading=false;
+  $listWrap.onscroll = function(){
+    if(currentMode!=="month" || loading) return;
+    if($listWrap.scrollTop <= 40){
+      loading=true;
+      const oldHeight = $listWrap.scrollHeight;
+      const oldTop = $listWrap.scrollTop;
+      monthStartOffset -= 5;
+      renderMonthBlocks(baseDate);
+      bindMonthEvents();
+      requestAnimationFrame(()=>{
+        const newHeight = $listWrap.scrollHeight;
+        $listWrap.scrollTop = newHeight - oldHeight + oldTop;
+        loading=false;
+      });
+    }
+  };
+}
+
+function renderDayView(reset=true){
+  updateButtons();
+
+  const baseDate = selectedDate
+    ? (ymdToDate(selectedDate) || getBaseWorkday())
+    : getBaseWorkday();
+
+  if(reset){
+    dayStartOffset = -5;
+    dayEndOffset = 5;
+  }
+
+  if(!selectedDate){
+    selectedDate = dateToYMD(baseDate);
+  }
+
+  const scrollerHtml = buildDayScrollerHtml(baseDate, dayStartOffset, dayEndOffset);
+
+  $container.innerHTML=`
+<div class="smallHint">주말 제외 · 선택한 날짜 기준 앞뒤 5영업일 기본 로딩 · 좌우 스크롤 끝까지 가면 5영업일씩 더 불러옵니다.</div>
+<div class="dayScroller" id="dayScroller">${scrollerHtml}</div>`;
+
+  bindAreaContainerEvents();
+  bindDayInfinite(baseDate);
+
+  setTimeout(()=>{
+    const scroller=document.getElementById("dayScroller");
+    if(scroller){
+      const focus=scroller.querySelector('[data-focus="1"]');
+      if(focus){
+        scroller.scrollLeft=Math.max(0, focus.offsetLeft - (scroller.clientWidth - focus.clientWidth)/2);
+      }
+    }
+  },30);
+}
+
+function buildDayScrollerHtml(baseDate, startOffset, endOffset){
+  let html="";
+  for(let i=startOffset;i<=endOffset;i++){
+    const d=addBusinessDays(baseDate, i);
+    const ymd=dateToYMD(d);
+    const todayFocus=ymd===baseWorkdayYMD() ? " todayFocus" : "";
+    html+=`
+<div class="dayPanel${todayFocus}" data-day-offset="${i}" data-focus="${i===0 ? 1 : 0}">
+  <div class="dayPanelHead">${formatDayPanelHead(d)}</div>
+  ${makeGroupedCardsHtml(getItemsByDate(ymd))}
+</div>`;
+  }
+  return html;
+}
+
+function bindDayInfinite(baseDate){
+  const scroller=document.getElementById("dayScroller");
+  if(!scroller) return;
+  let loading=false;
+
+  scroller.addEventListener("scroll",()=>{
+    if(loading) return;
+
+    if(scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 80){
+      loading=true;
+      const nextStart = dayEndOffset + 1;
+      const nextEnd = dayEndOffset + 5;
+      scroller.insertAdjacentHTML("beforeend", buildDayScrollerHtml(baseDate, nextStart, nextEnd));
+      dayEndOffset = nextEnd;
+      bindAreaContainerEvents();
+      loading=false;
+    }
+
+    if(scroller.scrollLeft <= 40){
+      loading=true;
+      const oldWidth = scroller.scrollWidth;
+      const oldLeft = scroller.scrollLeft;
+      const prevStart = dayStartOffset - 5;
+      const prevEnd = dayStartOffset - 1;
+      scroller.insertAdjacentHTML("afterbegin", buildDayScrollerHtml(baseDate, prevStart, prevEnd));
+      dayStartOffset = prevStart;
+      bindAreaContainerEvents();
+      requestAnimationFrame(()=>{
+        scroller.scrollLeft = scroller.scrollWidth - oldWidth + oldLeft;
+        loading=false;
+      });
+    }
+  });
 }
 
 function renderArea(){
-updateAreaButtons();
-
-let container=document.getElementById("container");
-container.innerHTML="";
-
-let areaData=data[currentArea]||[];
-
-if(areaData.length===0){
-container.innerHTML="데이터 없음";
-return;
-}
-
-areaData.forEach(item=>{
-
-let db=dbById[item.id]||{};
-let defect=db.AN||"";
-let resultValue=db.RESULT||"";
-let address=db.address||"";
-let resultHtml=resultBadgeHtml(resultValue);
-
-let insuranceName=highlightStatusText(db.Y||"");
-let insuranceDateText=formatShortDate(db.AA||"");
-let managerName=highlightStatusText(db.AC||"");
-let managerDateText=formatDate(db.AF||"");
-
-let insuranceExpired=isExpired(db.AA);
-let managerExpired=isExpired(db.AF);
-
-let insuranceDateHtml=insuranceDateText
-? (insuranceExpired
-  ? `<span class="redbold">${escapeHtml(insuranceDateText)}</span> 🚨`
-  : escapeHtml(insuranceDateText))
-: "-";
-
-let managerDateHtml=managerDateText
-? (managerExpired
-  ? `<span class="redbold">${escapeHtml(managerDateText)}</span> 🚨`
-  : escapeHtml(managerDateText))
-: "-";
-
-let defectHtml=formatDefect(escapeHtml(defect));
-let detailParts=[];
-
-detailParts.push(`보험사 ${insuranceName} : ${insuranceDateHtml}<br>안전관리자 ${managerName} : ${managerDateHtml}`);
-
-if(String(defect).trim()!==""){
-detailParts.push(defectHtml);
-}
-
-detailParts.push(`<div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(item.id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>`);
-
-let div=document.createElement("div");
-div.className="item "+getCardClass(resultValue);
-div.onclick=()=>toggle(div);
-
-let type=String(item.type||"");
-if(type.includes("정밀")){
-type='<span class="precise">'+escapeHtml(type)+'</span>';
-}else{
-type=escapeHtml(type);
-}
-
-let timeHtml=formatTimeHtml(item.time);
-
-div.innerHTML=`
-<div class="titleRow">
-  <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}</b>
-  ${resultHtml || ""}
-</div>
-${formatDate(item.date)} / ${timeHtml} / ${type} / ${escapeHtml(item.area)}
-<div class="detail">${detailParts.join("<br><br>")}</div>
-`;
-
-let mapBtn=div.querySelector(".mapBtn");
-if(mapBtn){
-mapBtn.addEventListener("click",function(e){
-e.preventDefault();
-e.stopPropagation();
-openNaverMap(address);
-});
-}
-
-container.appendChild(div);
-});
+  updateButtons();
+  const areaData=data[currentArea]||[];
+  if(!areaData.length){
+    $container.innerHTML="데이터 없음";
+    return;
+  }
+  $container.innerHTML=areaData.map(makeAreaCardHtml).join("");
+  bindAreaContainerEvents();
 }
 
 function renderSearch(q){
-let normalizedQ=normalizeSearch(q);
-let q7=pad7(normalizedQ.replace(/\D/g,""));
+  const normalizedQ=normalizeSearch(q);
+  const q7=pad7(normalizedQ.replace(/\D/g,""));
 
-let result=dbRows.filter(r=>
-includesNormalized(r.name,q)||
-includesNormalized(r.id,q)||
-(normalizedQ && normalizeSearch(r.id).includes(normalizeSearch(q7)))
-);
+  const result=dbRows
+    .filter(r=>
+      includesNormalized(r.name,q) ||
+      includesNormalized(r.id,q) ||
+      (normalizedQ && normalizeSearch(r.id).includes(normalizeSearch(q7)))
+    )
+    .sort((a,b)=>{
+      const ak=getResultSortKey(a);
+      const bk=getResultSortKey(b);
+      const byName=ak.localeCompare(bk,"ko",{numeric:true,sensitivity:"base"});
+      if(byName!==0) return byName;
+      return String(a.id||"").localeCompare(String(b.id||""),"ko",{numeric:true,sensitivity:"base"});
+    });
 
-let container=document.getElementById("container");
-container.innerHTML="";
-
-result.forEach(r=>{
-
-let defect=r.AN||"";
-let resultValue=r.RESULT||"";
-let resultHtml=resultBadgeHtml(resultValue);
-
-let div=document.createElement("div");
-div.className="item "+getCardClass(resultValue);
-
-let yText=highlightStatusText(r.Y);
-let acText=highlightStatusText(r.AC);
-
-let aaText=formatShortDate(r.AA);
-let afText=formatDate(r.AF);
-
-let aaExpired=isExpired(r.AA);
-let afExpired=isExpired(r.AF);
-
-let aaHtml=aaText
-? (aaExpired
-  ? `<span class="redbold">${escapeHtml(aaText)}</span> 🚨`
-  : escapeHtml(aaText))
-: "-";
-
-let afHtml=afText
-? (afExpired
-  ? `<span class="redbold">${escapeHtml(afText)}</span> 🚨`
-  : escapeHtml(afText))
-: "-";
-
-let defectHtml=formatDefect(escapeHtml(defect));
-
-div.innerHTML=`
-<div class="titleRow">
-  <b>${escapeHtml(r.name)} ${escapeHtml(r.id)}</b>
-  ${resultHtml || ""}
-</div>
-보험사 ${yText} : ${aaHtml}<br>
-안전관리자 ${acText} : ${afHtml}
-${String(defect).trim()!=="" ? `<br><br>${defectHtml}` : ``}
-<br><br><div class="linkRow"><a href="https://m.elevator.go.kr/qrcode.do?no_plaq=${encodeURIComponent(r.id)}" target="_blank" onclick="event.stopPropagation();">승강기정보센터보기</a><a href="#" class="mapBtn" onclick="event.stopPropagation();return false;"><img src="${NAVERMAP_ICON}" alt="네이버지도" class="mapIcon"></a></div>
-`;
-
-let mapBtn=div.querySelector(".mapBtn");
-if(mapBtn){
-mapBtn.addEventListener("click",function(e){
-e.preventDefault();
-e.stopPropagation();
-openNaverMap(r.address);
-});
+  $container.innerHTML=result.length ? result.map(makeSearchCardHtml).join("") : "검색 결과 없음";
+  bindAreaContainerEvents();
 }
 
-container.appendChild(div);
-});
+function applyStateToView(){
+  const q=$search.value.trim();
+  if(q){
+    renderSearch(q);
+    return;
+  }
+  if(currentMode==="area") renderArea();
+  else if(currentMode==="month") renderMonthView(true);
+  else if(currentMode==="day") renderDayView(false);
 }
 
-document.getElementById("search").addEventListener("input",function(){
-let v=this.value.trim();
-let s=document.getElementById("suggest");
-s.innerHTML="";
+function rebuildSuggestions(){
+  const v=$search.value.trim();
+  if(!v){
+    $suggest.innerHTML="";
+    $suggest.style.display="none";
+    return;
+  }
 
-if(!v){
-renderArea();
-return;
+  const normalizedV=normalizeSearch(v);
+  const q7=pad7(normalizedV.replace(/\D/g,""));
+  const list=keywordList
+    .filter(k=>
+      includesNormalized(k,v) ||
+      (normalizedV && normalizeSearch(k).includes(normalizeSearch(q7)))
+    )
+    .sort((a,b)=>{
+      const ak=getSuggestSortKey(a);
+      const bk=getSuggestSortKey(b);
+      const byName=ak.localeCompare(bk,"ko",{numeric:true,sensitivity:"base"});
+      if(byName!==0) return byName;
+      return String(a).localeCompare(String(b),"ko",{numeric:true,sensitivity:"base"});
+    })
+    .slice(0,10);
+
+  if(!list.length){
+    $suggest.innerHTML="";
+    $suggest.style.display="none";
+    return;
+  }
+
+  $suggest.innerHTML=list.map(k=>`<div class="sitem">${escapeHtml(k)}</div>`).join("");
+  $suggest.style.display="block";
+
+  $suggest.querySelectorAll(".sitem").forEach((el,idx)=>{
+    el.addEventListener("click",()=>{
+      const k=list[idx];
+      $search.value=k;
+      $suggest.innerHTML="";
+      $suggest.style.display="none";
+      renderSearch(k);
+      $listWrap.scrollTop=0;
+    });
+  });
 }
 
-let normalizedV=normalizeSearch(v);
-let q7=pad7(normalizedV.replace(/\D/g,""));
+function buildStateFromParsed(rowsA, rowsB){
+  data={gangbuk:[],gangnam:[],gyeonggi:[]};
+  dbRows=[];
+  dbById={};
+  keywordList=[];
+  calendarItems=[];
 
-let list=keywordList
-.filter(k=>
-includesNormalized(k,v)||
-(normalizedV && normalizeSearch(k).includes(normalizeSearch(q7)))
-)
-.slice(0,10);
+  for(const c of rowsB.slice(1)){
+    const rawId=(c[1]||"").trim();
+    const id=pad7(rawId);
 
-list.forEach(k=>{
-let d=document.createElement("div");
-d.className="sitem";
-d.innerText=k;
-d.onclick=()=>{
-document.getElementById("search").value=k;
-s.innerHTML="";
-renderSearch(k);
-};
-s.appendChild(d);
+    const row={
+      name:c[0]||"",
+      id,
+      address:c[9]||"",
+      AI:c[34]||"",
+      areaGroup:normalizeAreaLabel(c[8]||""),
+      AJ:c[35]||"",
+      RESULT:c[36]||"",
+      Y:c[26]||"",
+      AA:c[28]||"",
+      AC:c[30]||"",
+      AF:c[33]||"",
+      AN:c[39]||""
+    };
+
+    dbRows.push(row);
+    dbById[id]=row;
+    if(row.name) keywordList.push(`${row.name} ${id}`);
+    if(/^\d+$/.test(rawId)) keywordList.push(id);
+  }
+
+  const rowsAData=rowsA.slice(1);
+  let lastDate1="", lastDate2="", lastDate3="";
+  const scheduledIdSet=new Set();
+
+  for(const c of rowsAData){
+    const date1=c[0]||lastDate1; if(c[0]) lastDate1=c[0];
+    const date2=c[8]||lastDate2; if(c[8]) lastDate2=c[8];
+    const date3=c[16]||lastDate3; if(c[16]) lastDate3=c[16];
+
+    if(c[3]){
+      const id=extract7(c[5]);
+      const item={name:c[3],date:date1,time:c[1],type:c[2],area:c[4],id};
+      data.gangbuk.push(item);
+      if(id) scheduledIdSet.add(id);
+    }
+    if(c[11]){
+      const id=extract7(c[13]);
+      const item={name:c[11],date:date2,time:c[9],type:c[10],area:c[12],id};
+      data.gangnam.push(item);
+      if(id) scheduledIdSet.add(id);
+    }
+    if(c[19]){
+      const id=extract7(c[21]);
+      const item={name:c[19],date:date3,time:c[17],type:c[18],area:c[20],id};
+      data.gyeonggi.push(item);
+      if(id) scheduledIdSet.add(id);
+    }
+  }
+
+  sortData(data.gangbuk);
+  sortData(data.gangnam);
+  sortData(data.gyeonggi);
+
+  data.gangbuk.forEach(v=>{
+    calendarItems.push({
+      name:v.name,
+      id:v.id,
+      date:normalizeScheduleDateToYMD(v.date),
+      time:v.time,
+      type:v.type,
+      areaDetail:v.area,
+      areaLabel:"강북",
+      address:(dbById[v.id]||{}).address||"",
+      source:"A"
+    });
+  });
+  data.gangnam.forEach(v=>{
+    calendarItems.push({
+      name:v.name,
+      id:v.id,
+      date:normalizeScheduleDateToYMD(v.date),
+      time:v.time,
+      type:v.type,
+      areaDetail:v.area,
+      areaLabel:"강남",
+      address:(dbById[v.id]||{}).address||"",
+      source:"A"
+    });
+  });
+  data.gyeonggi.forEach(v=>{
+    calendarItems.push({
+      name:v.name,
+      id:v.id,
+      date:normalizeScheduleDateToYMD(v.date),
+      time:v.time,
+      type:v.type,
+      areaDetail:v.area,
+      areaLabel:"경기",
+      address:(dbById[v.id]||{}).address||"",
+      source:"A"
+    });
+  });
+
+  for(const row of dbRows){
+    const extraDate=normalizeScheduleDateToYMD(row.AJ);
+    if(!row.id || scheduledIdSet.has(row.id) || !extraDate) continue;
+
+    calendarItems.push({
+      name:row.name||"",
+      id:row.id,
+      date:extraDate,
+      time:"",
+      type:"일정추가",
+      areaDetail:row.AI || "",
+      areaLabel:normalizeAreaLabel(row.areaGroup),
+      address:row.address||"",
+      source:"B"
+    });
+  }
+
+  calendarItems=sortItemsByDateTime(calendarItems.filter(v=>/^\d{4}-\d{2}-\d{2}$/.test(v.date)));
+  buildCalendarCounts();
+
+  if(!selectedDate) selectedDate=todayYMD();
+}
+
+function saveCache(rowsA, rowsB){
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      savedAt:Date.now(),
+      rowsA,
+      rowsB
+    }));
+  }catch(e){}
+}
+
+function loadCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(!raw) return null;
+    const parsed=JSON.parse(raw);
+    if(!parsed || !parsed.rowsA || !parsed.rowsB) return null;
+    return parsed;
+  }catch(e){
+    return null;
+  }
+}
+
+function showCacheHint(text){
+  $cacheHint.textContent=text||"";
+}
+
+async function loadAllData(forceRefresh=false){
+  const cached=loadCache();
+  const now=Date.now();
+
+  if(cached && !forceRefresh){
+    buildStateFromParsed(cached.rowsA, cached.rowsB);
+    showCacheHint("저장된 데이터 먼저 표시 중 · 최신 데이터 확인중...");
+    applyStateToView();
+  }
+
+  if(!cached || forceRefresh) showLoading();
+
+  try{
+    const [a,b]=await Promise.all([
+      fetchTextWithRetry(ACSV,3,700),
+      fetchTextWithRetry(BCSV,3,700)
+    ]);
+
+    const rowsA=parseCSV(a);
+    const rowsB=parseCSV(b);
+
+    buildStateFromParsed(rowsA, rowsB);
+    saveCache(rowsA, rowsB);
+    showCacheHint("최신 데이터 반영 완료");
+    applyStateToView();
+    $listWrap.scrollTop=0;
+
+  }catch(err){
+    if(!cached){
+      $container.innerHTML="데이터 불러오기 오류<br><br>새로고침 버튼을 눌러 다시 시도해주세요.";
+      showCacheHint("");
+    }
+    console.error(err);
+  }finally{
+    hideLoading();
+    if(cached && (now-cached.savedAt)>CACHE_TTL_MS){
+      showCacheHint("표시된 데이터는 캐시이며, 최신 데이터 확인을 시도했습니다.");
+    }
+  }
+}
+
+function showArea(area){
+  currentArea=area;
+  currentMode="area";
+  updateButtons();
+  $suggest.style.display="none";
+  renderArea();
+  $listWrap.scrollTop=0;
+}
+
+function showCalendarMode(mode){
+  currentMode = mode;
+
+  if(mode==="month"){
+    selectedDate = baseWorkdayYMD();
+    updateButtons();
+    $suggest.style.display="none";
+    renderMonthView(true);
+  }
+
+  if(mode==="day"){
+    selectedDate = baseWorkdayYMD();
+    updateButtons();
+    $suggest.style.display="none";
+    renderDayView(false);
+  }
+
+  $listWrap.scrollTop=0;
+}
+
+function goToday(){
+  selectedDate = baseWorkdayYMD();
+
+  if(currentMode==="month"){
+    renderMonthView(true);
+  }
+
+  if(currentMode==="day"){
+    renderDayView(false);
+  }
+
+  $listWrap.scrollTop=0;
+}
+
+function reloadData(){
+  $suggest.innerHTML="";
+  $suggest.style.display="none";
+  loadAllData(true);
+}
+
+$search.addEventListener("input",function(){
+  const v=this.value.trim();
+  if(!v){
+    $suggest.innerHTML="";
+    $suggest.style.display="none";
+    applyStateToView();
+    return;
+  }
+  rebuildSuggestions();
+  renderSearch(v);
+  $listWrap.scrollTop=0;
 });
 
-renderSearch(v);
+$search.addEventListener("focus",function(){
+  if(this.value.trim()) rebuildSuggestions();
 });
 
-updateAreaButtons();
+$listWrap.addEventListener("scroll",()=>{
+  $suggest.style.display="none";
+});
+
+updateButtons();
+loadAllData(false);
 </script>
-
 </body>
 </html>
