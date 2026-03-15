@@ -472,6 +472,8 @@ let dayStartOffset = -5;
 let dayEndOffset = 5;
 let monthStartOffset = 0;
 let monthEndOffset = 4;
+let monthLoading = false;
+let monthAnchorDate = "";
 
 function showLoading(){ $overlay.style.display="flex"; }
 function hideLoading(){ $overlay.style.display="none"; }
@@ -648,14 +650,12 @@ function includesNormalized(target,query){
   return normalizeSearch(target).includes(normalizeSearch(query));
 }
 
-/* 연관검색어는 이름+괄호를 유지하고 끝 7자리 번호만 제거 */
 function getSuggestSortKey(v){
   const s=String(v||"").trim();
   let base=s.replace(/\s+\d{7}\s*$/,"").trim();
   return base.replace(/\s+/g,"");
 }
 
-/* 검색결과 카드 정렬도 이름 기준, 승강기번호 제외 */
 function getResultSortKey(row){
   return String(row?.name||"").trim().replace(/\s+/g,"");
 }
@@ -798,6 +798,20 @@ function makeDetailHtml(id,address,insuranceName,insuranceDateHtml,managerName,m
   return html;
 }
 
+function makeItemSubLine(item){
+  const dateText = formatDate(item.date);
+  const aiText = String(item.area || "").trim();
+
+  if(item.source==="B"){
+    return aiText ? `${dateText} / ${escapeHtml(aiText)}` : `${dateText}`;
+  }
+
+  let type=String(item.type||"");
+  type=type.includes("정밀") ? `<span class="precise">${escapeHtml(type)}</span>` : escapeHtml(type);
+
+  return `${dateText} / ${formatTimeHtml(item.time)} / ${type} / ${escapeHtml(item.area)}`;
+}
+
 function makeAreaCardHtml(item){
   const db=dbById[item.id]||{};
   const defect=db.AN||"";
@@ -808,16 +822,13 @@ function makeAreaCardHtml(item){
   const managerDateHtml=makeDateHtml(db.AF,isExpired(db.AF),false);
   const resultHtml=resultBadgeHtml(resultValue);
 
-  let type=String(item.type||"");
-  type=type.includes("정밀") ? `<span class="precise">${escapeHtml(type)}</span>` : escapeHtml(type);
-
   return `
 <div class="item ${getCardClass(resultValue)}">
   <div class="titleRow">
     <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}</b>
     ${resultHtml}
   </div>
-  ${formatDate(item.date)} / ${formatTimeHtml(item.time)} / ${type} / ${escapeHtml(item.area)}
+  ${makeItemSubLine(item)}
   <div class="detail">${makeDetailHtml(item.id,db.address||"",insuranceName,insuranceDateHtml,managerName,managerDateHtml,defect)}</div>
 </div>`;
 }
@@ -895,7 +906,7 @@ function getMonthCellAreaCountHtml(ymd){
 }
 
 function makeCalendarCardHtml(item){
-  const areaText=item.areaDetail || item.areaLabel || "";
+  const areaText=item.source==="B" ? (item.areaDetail || "") : (item.areaDetail || item.areaLabel || "");
   return makeAreaCardHtml({
     name:item.name||"",
     id:item.id||"",
@@ -960,6 +971,13 @@ function getMonthBusinessGrid(year, month){
   return weekRows;
 }
 
+function monthHasAnyData(monthDate){
+  const y=monthDate.getFullYear();
+  const m=String(monthDate.getMonth()+1).padStart(2,"0");
+  const prefix=`${y}-${m}-`;
+  return calendarItems.some(item => String(item.date).startsWith(prefix));
+}
+
 function renderMonthView(reset=true){
   updateButtons();
   const baseYMD=baseWorkdayYMD();
@@ -969,11 +987,13 @@ function renderMonthView(reset=true){
     monthStartOffset = 0;
     monthEndOffset = 4;
     if(!selectedDate || currentMode==="month") selectedDate = baseYMD;
+    monthLoading = false;
+    monthAnchorDate = "";
     $listWrap.onscroll = null;
   }
 
   $container.innerHTML=`
-<div class="smallHint">주말 제외 · 오늘 기준월부터 표시 · 이전월로 스크롤하면 5개월씩 더 불러옵니다. 날짜를 누르면 일간으로 이동합니다.</div>
+<div class="smallHint">주말 제외 · 오늘 기준월부터 표시 · 이전월로 스크롤하면 5개월씩 더 불러옵니다. 일정 없는 월은 숨깁니다. 날짜를 누르면 일간으로 이동합니다.</div>
 <div id="monthWrap"></div>
 <div class="monthSection todayFocus">
   <div class="monthTitle">오늘부터 일정</div>
@@ -990,11 +1010,14 @@ function renderMonthBlocks(baseDate){
   const wrap=document.getElementById("monthWrap");
   if(!wrap) return;
   let html="";
+
   for(let offset=monthStartOffset; offset<=monthEndOffset; offset++){
     const monthDate=new Date(baseDate.getFullYear(), baseDate.getMonth()+offset, 1);
+    if(!monthHasAnyData(monthDate)) continue;
     html += makeMonthSectionHtml(monthDate, baseWorkdayYMD());
   }
-  wrap.innerHTML=html;
+
+  wrap.innerHTML=html || `<div class="monthSection"><div class="emptyMini">표시할 월간 일정이 없습니다.</div></div>`;
 }
 
 function makeMonthSectionHtml(monthDate, baseYMD){
@@ -1043,20 +1066,29 @@ function bindMonthEvents(){
 }
 
 function bindMonthInfinite(baseDate){
-  let loading=false;
+  monthLoading = false;
   $listWrap.onscroll = function(){
-    if(currentMode!=="month" || loading) return;
-    if($listWrap.scrollTop <= 40){
-      loading=true;
-      const oldHeight = $listWrap.scrollHeight;
-      const oldTop = $listWrap.scrollTop;
+    if(currentMode!=="month" || monthLoading) return;
+
+    if($listWrap.scrollTop <= 20){
+      monthLoading = true;
+
+      const firstVisible = $container.querySelector("#monthWrap .monthSection");
+      monthAnchorDate = firstVisible ? firstVisible.getAttribute("data-month") : "";
+
       monthStartOffset -= 5;
       renderMonthBlocks(baseDate);
       bindMonthEvents();
+
       requestAnimationFrame(()=>{
-        const newHeight = $listWrap.scrollHeight;
-        $listWrap.scrollTop = newHeight - oldHeight + oldTop;
-        loading=false;
+        if(monthAnchorDate){
+          const anchorEl = $container.querySelector(`#monthWrap .monthSection[data-month="${monthAnchorDate}"]`);
+          if(anchorEl){
+            anchorEl.scrollIntoView({block:"start"});
+          }
+        }
+        $listWrap.scrollTop = Math.max(2, $listWrap.scrollTop);
+        monthLoading = false;
       });
     }
   };
@@ -1351,7 +1383,7 @@ function buildStateFromParsed(rowsA, rowsB){
       id:row.id,
       date:extraDate,
       time:"",
-      type:"일정추가",
+      type:"",
       areaDetail:row.AI || "",
       areaLabel:normalizeAreaLabel(row.areaGroup),
       address:row.address||"",
