@@ -125,22 +125,60 @@ right:0;
 top:calc(100% + 3px);
 background:#fff;
 border-radius:8px;
-max-height:108px;
-overflow-y:auto;
+max-height:55vh;
+overflow-y:scroll;
 box-shadow:0 8px 18px rgba(0,0,0,0.16);
 z-index:100;
 display:none;
+scrollbar-width:auto;
+scrollbar-color:#bdbdbd #f2f2f2;
+}
+#suggest::after{
+content:"";
+position:absolute;
+top:0;
+right:0;
+width:18px;
+height:100%;
+background:linear-gradient(to left, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0) 100%);
+pointer-events:none;
+border-top-right-radius:8px;
+border-bottom-right-radius:8px;
+z-index:1;
+}
+#suggest::-webkit-scrollbar{
+width:12px;
+}
+#suggest::-webkit-scrollbar-track{
+background:#f2f2f2;
+border-left:1px solid #e2e2e2;
+border-top-right-radius:8px;
+border-bottom-right-radius:8px;
+}
+#suggest::-webkit-scrollbar-thumb{
+background:#bdbdbd;
+border-radius:999px;
+border:2px solid #f2f2f2;
+}
+#suggest::-webkit-scrollbar-thumb:hover{
+background:#9f9f9f;
 }
 .sitem{
-padding:8px 10px;
+padding:8px 20px 8px 10px;
 cursor:pointer;
 min-height:36px;
 box-sizing:border-box;
 display:flex;
 align-items:center;
+position:relative;
+z-index:0;
 }
 .sitem:hover{
 background:#eee;
+}
+.hl-orange{
+color:#ff7a00;
+font-weight:700;
 }
 #listWrap{
 flex:1 1 auto;
@@ -366,6 +404,17 @@ gap:12px;
 scroll-snap-type:x mandatory;
 padding-bottom:8px;
 }
+.dayScroller::-webkit-scrollbar{
+height:10px;
+}
+.dayScroller::-webkit-scrollbar-track{
+background:#ececec;
+border-radius:999px;
+}
+.dayScroller::-webkit-scrollbar-thumb{
+background:#b7b7b7;
+border-radius:999px;
+}
 .dayPanel{
 min-width:88%;
 max-width:88%;
@@ -413,11 +462,35 @@ margin-bottom:8px;
 border:2px solid #e11d48 !important;
 box-shadow:0 0 0 1px rgba(225,29,72,0.15);
 }
+
+@media (min-width: 900px){
+.dayPanel{
+min-width:calc((100% - 24px) / 3);
+max-width:calc((100% - 24px) / 3);
+}
+}
+
+@media (min-width: 1280px){
+.dayPanel{
+min-width:calc((100% - 12px) / 2.4);
+max-width:calc((100% - 12px) / 2.4);
+}
+}
+
 @media (max-width: 480px){
 #pageTitle{ font-size:18px; }
 button{ padding:7px 11px; font-size:13px; }
 #loadingText{ font-size:24px; }
 #btn-refresh,#btn-today{ padding:7px 11px; font-size:13px; }
+#suggest{
+max-height:55vh;
+}
+#suggest::after{
+width:14px;
+}
+.sitem{
+padding-right:16px;
+}
 }
 </style>
 </head>
@@ -561,25 +634,42 @@ function ymdToDate(ymd){
   return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
 }
 
+function isValidYMD(y,m,d){
+  y=Number(y); m=Number(m); d=Number(d);
+  if(!y || m<1 || m>12 || d<1 || d>31) return false;
+  const dt=new Date(y,m-1,d);
+  return dt.getFullYear()===y && dt.getMonth()===(m-1) && dt.getDate()===d;
+}
+
 function normalizeScheduleDateToYMD(v){
   const s=String(v||"").trim();
   if(!s) return "";
-  const digits=s.replace(/[^\d]/g,"");
 
-  if(/^\d{8}$/.test(digits)){
-    if(digits.startsWith("20")) return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
-    return `20${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4,6)}`;
+  let m=s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if(m && isValidYMD(m[1],m[2],m[3])){
+    return `${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`;
   }
-  if(/^\d{6}$/.test(digits)) return `20${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4,6)}`;
 
-  const m=s.match(/^(\d{2,4})-(\d{2})-(\d{2})$/);
+  m=s.match(/(^|[^\d])(\d{2})\D+(\d{1,2})\D+(\d{1,2})([^\d]|$)/);
   if(m){
-    const y=m[1].length===2 ? `20${m[1]}` : m[1];
-    return `${y}-${m[2]}-${m[3]}`;
+    const yy=`20${m[2]}`;
+    if(isValidYMD(yy,m[3],m[4])){
+      return `${yy}-${String(m[3]).padStart(2,"0")}-${String(m[4]).padStart(2,"0")}`;
+    }
   }
 
-  const d=new Date(s);
-  return isNaN(d) ? "" : dateToYMD(d);
+  const digits=s.replace(/[^\d]/g,"");
+  if(/^\d{8}$/.test(digits)){
+    const y=digits.slice(0,4), mo=digits.slice(4,6), d=digits.slice(6,8);
+    if(isValidYMD(y,mo,d)) return `${y}-${mo}-${d}`;
+  }
+  if(/^\d{6}$/.test(digits)){
+    const y=`20${digits.slice(0,2)}`, mo=digits.slice(2,4), d=digits.slice(4,6);
+    if(isValidYMD(y,mo,d)) return `${y}-${mo}-${d}`;
+  }
+
+  const dt=new Date(s);
+  return isNaN(dt) ? "" : dateToYMD(dt);
 }
 
 function getBaseWorkday(date=new Date()){
@@ -615,17 +705,8 @@ function isExpired(v){
 
 function formatDate(v){
   if(!v) return "";
-  const s=String(v).trim();
-  const n=normalizeDateDigits(s);
-
-  if(/^\d{8}$/.test(n)){
-    if(n.startsWith("20")) return `${n.slice(0,4)}-${n.slice(4,6)}-${n.slice(6,8)}`;
-    return `${n.slice(0,2)}-${n.slice(2,4)}-${n.slice(4,6)}`;
-  }
-  if(/^\d{6}$/.test(n)) return `${n.slice(0,2)}-${n.slice(2,4)}-${n.slice(4,6)}`;
-
-  const d=new Date(s);
-  return isNaN(d) ? s : dateToYMD(d);
+  const ymd=normalizeScheduleDateToYMD(v);
+  return ymd || String(v).trim();
 }
 
 function formatShortDate(v){
@@ -659,8 +740,19 @@ function normalizeSearch(v){
   return String(v||"").toLowerCase().replace(/\s+/g,"").trim();
 }
 
+function normalizeDigits(v){
+  return String(v||"").replace(/\D/g,"");
+}
+
 function includesNormalized(target,query){
   return normalizeSearch(target).includes(normalizeSearch(query));
+}
+
+function includesDigitLoose(target,query){
+  const t=normalizeDigits(target);
+  const q=normalizeDigits(query);
+  if(!q) return false;
+  return t.includes(q);
 }
 
 function getSuggestSortKey(v){
@@ -804,8 +896,8 @@ function updateButtons(){
 
 function sortData(arr){
   arr.sort((a,b)=>{
-    const da=new Date((a.date||"")+" "+(a.time||""));
-    const db=new Date((b.date||"")+" "+(b.time||""));
+    const da=new Date((normalizeScheduleDateToYMD(a.date)||"")+" "+(a.time||""));
+    const db=new Date((normalizeScheduleDateToYMD(b.date)||"")+" "+(b.time||""));
     return da-db;
   });
 }
@@ -823,7 +915,7 @@ function makeDetailHtml(id,address,insuranceName,insuranceDateHtml,managerName,m
   return html;
 }
 
-function buildSubLine(item, compact=false){
+function buildSubLine(item){
   const dateText = formatDate(item.date||"");
   const timeText = String(item.time||"").trim();
   const areaText = String(item.area || item.areaDetail || "").trim();
@@ -840,7 +932,7 @@ function buildSubLine(item, compact=false){
 }
 
 function makeBaseCardHtml(item, options={}){
-  const { compact=false, searchMode=false } = options;
+  const { searchMode=false } = options;
 
   const db=dbById[item.id]||{};
   const defect=db.AN||"";
@@ -852,7 +944,7 @@ function makeBaseCardHtml(item, options={}){
   const resultHtml=resultBadgeHtml(resultValue);
   const typeChip = typeChipHtml(getCardTypeLabel(item, searchMode));
   const areaBadge = searchMode ? areaRoundBadgeHtml(item.areaGroup || "") : "";
-  const subLine = buildSubLine(item, compact);
+  const subLine = buildSubLine(item);
 
   return `
 <div class="item ${getCardClass(resultValue)}">
@@ -868,15 +960,15 @@ function makeBaseCardHtml(item, options={}){
 }
 
 function makeAreaCardHtml(item){
-  return makeBaseCardHtml(item,{compact:false,searchMode:false});
+  return makeBaseCardHtml(item,{searchMode:false});
 }
 
 function makeCompactCardHtml(item){
-  return makeBaseCardHtml(item,{compact:true,searchMode:false});
+  return makeBaseCardHtml(item,{searchMode:false});
 }
 
 function makeSearchCardHtml(r){
-  return makeBaseCardHtml(r,{compact:true,searchMode:true});
+  return makeBaseCardHtml(r,{searchMode:true});
 }
 
 function bindAreaContainerEvents(){
@@ -1205,14 +1297,19 @@ function renderArea(){
 
 function renderSearch(q){
   const normalizedQ=normalizeSearch(q);
-  const q7=pad7(normalizedQ.replace(/\D/g,""));
+  const q7=pad7(normalizeDigits(q));
 
   const result=dbRows
-    .filter(r=>
-      includesNormalized(r.name,q) ||
-      includesNormalized(r.id,q) ||
-      (normalizedQ && normalizeSearch(r.id).includes(normalizeSearch(q7)))
-    )
+    .filter(r=>{
+      const combined = `${r.name||""} ${r.id||""}`;
+      return (
+        includesNormalized(r.name,q) ||
+        includesNormalized(r.id,q) ||
+        includesNormalized(combined,q) ||
+        includesDigitLoose(r.id,q) ||
+        (normalizedQ && normalizeSearch(r.id).includes(normalizeSearch(q7)))
+      );
+    })
     .sort((a,b)=>{
       const ak=getResultSortKey(a);
       const bk=getResultSortKey(b);
@@ -1236,6 +1333,56 @@ function applyStateToView(){
   else if(currentMode==="day") renderDayView(false);
 }
 
+function highlightSuggestText(text, query){
+  const rawText=String(text||"");
+  const rawQuery=String(query||"").trim();
+  if(!rawQuery) return escapeHtml(rawText);
+
+  const escapedQuery=rawQuery.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+
+  if(rawQuery){
+    const directRegex=new RegExp(escapedQuery, "gi");
+    if(directRegex.test(rawText)){
+      return escapeHtml(rawText).replace(directRegex, m=>`<span class="hl-orange">${m}</span>`);
+    }
+  }
+
+  const qDigits=normalizeDigits(rawQuery);
+  if(qDigits){
+    let result="";
+    let i=0;
+    while(i<rawText.length){
+      const ch=rawText[i];
+      if(/\d/.test(ch)){
+        let j=i;
+        while(j<rawText.length && /\d/.test(rawText[j])) j++;
+        const numPart=rawText.slice(i,j);
+        const idx=numPart.indexOf(qDigits);
+        if(idx>=0){
+          result += escapeHtml(numPart.slice(0,idx));
+          result += `<span class="hl-orange">${escapeHtml(numPart.slice(idx, idx+qDigits.length))}</span>`;
+          result += escapeHtml(numPart.slice(idx+qDigits.length));
+        }else{
+          result += escapeHtml(numPart);
+        }
+        i=j;
+      }else{
+        result += escapeHtml(ch);
+        i++;
+      }
+    }
+    return result;
+  }
+
+  return escapeHtml(rawText);
+}
+
+function clearSearchUI(){
+  $search.value="";
+  $suggest.innerHTML="";
+  $suggest.style.display="none";
+}
+
 function rebuildSuggestions(){
   const v=$search.value.trim();
   if(!v){
@@ -1244,21 +1391,22 @@ function rebuildSuggestions(){
     return;
   }
 
-  const normalizedV=normalizeSearch(v);
-  const q7=pad7(normalizedV.replace(/\D/g,""));
   const list=keywordList
-    .filter(k=>
-      includesNormalized(k,v) ||
-      (normalizedV && normalizeSearch(k).includes(normalizeSearch(q7)))
-    )
+    .filter(k=>{
+      return (
+        includesNormalized(k.text,v) ||
+        includesNormalized(k.name,v) ||
+        includesNormalized(k.id,v) ||
+        includesDigitLoose(k.id,v)
+      );
+    })
     .sort((a,b)=>{
-      const ak=getSuggestSortKey(a);
-      const bk=getSuggestSortKey(b);
+      const ak=getSuggestSortKey(a.text);
+      const bk=getSuggestSortKey(b.text);
       const byName=ak.localeCompare(bk,"ko",{numeric:true,sensitivity:"base"});
       if(byName!==0) return byName;
-      return String(a).localeCompare(String(b),"ko",{numeric:true,sensitivity:"base"});
-    })
-    .slice(0,10);
+      return String(a.id||"").localeCompare(String(b.id||""),"ko",{numeric:true,sensitivity:"base"});
+    });
 
   if(!list.length){
     $suggest.innerHTML="";
@@ -1266,17 +1414,36 @@ function rebuildSuggestions(){
     return;
   }
 
-  $suggest.innerHTML=list.map(k=>`<div class="sitem">${escapeHtml(k)}</div>`).join("");
+  $suggest.innerHTML=list.map(k=>`<div class="sitem">${highlightSuggestText(k.text, v)}</div>`).join("");
   $suggest.style.display="block";
 
   $suggest.querySelectorAll(".sitem").forEach((el,idx)=>{
     el.addEventListener("click",()=>{
       const k=list[idx];
-      $search.value=k;
+      $search.value=k.text;
       $suggest.innerHTML="";
       $suggest.style.display="none";
-      renderSearch(k);
+      renderSearch(k.text);
       $listWrap.scrollTop=0;
+    });
+  });
+}
+
+function pushCalendarItemFromArea(areaKey, areaLabel){
+  (data[areaKey]||[]).forEach(v=>{
+    const ymd=normalizeScheduleDateToYMD(v.date);
+    if(!ymd) return;
+
+    calendarItems.push({
+      name:v.name,
+      id:v.id,
+      date:ymd,
+      time:v.time,
+      type:v.type,
+      areaDetail:v.area,
+      areaLabel,
+      address:(dbById[v.id]||{}).address||"",
+      source:"A"
     });
   });
 }
@@ -1309,9 +1476,23 @@ function buildStateFromParsed(rowsA, rowsB){
 
     dbRows.push(row);
     dbById[id]=row;
-    if(row.name) keywordList.push(`${row.name} ${id}`);
-    if(/^\d+$/.test(rawId)) keywordList.push(id);
+
+    if(row.name || row.id){
+      keywordList.push({
+        text:`${String(row.name||"").trim()} ${String(id||"").trim()}`.trim(),
+        name:String(row.name||"").trim(),
+        id:String(id||"").trim()
+      });
+    }
   }
+
+  const seenSuggest=new Set();
+  keywordList=keywordList.filter(k=>{
+    const key=`${normalizeSearch(k.name)}|${normalizeDigits(k.id)}`;
+    if(seenSuggest.has(key)) return false;
+    seenSuggest.add(key);
+    return true;
+  });
 
   const rowsAData=rowsA.slice(1);
   let lastDate1="", lastDate2="", lastDate3="";
@@ -1322,19 +1503,21 @@ function buildStateFromParsed(rowsA, rowsB){
     const date2=c[8]||lastDate2; if(c[8]) lastDate2=c[8];
     const date3=c[16]||lastDate3; if(c[16]) lastDate3=c[16];
 
-    if(c[3]){
+    if(String(c[3]||"").trim()){
       const id=extract7(c[5]);
       const item={name:c[3],date:date1,time:c[1],type:c[2],area:c[4],id};
       data.gangbuk.push(item);
       if(id) scheduledIdSet.add(id);
     }
-    if(c[11]){
+
+    if(String(c[11]||"").trim()){
       const id=extract7(c[13]);
       const item={name:c[11],date:date2,time:c[9],type:c[10],area:c[12],id};
       data.gangnam.push(item);
       if(id) scheduledIdSet.add(id);
     }
-    if(c[19]){
+
+    if(String(c[19]||"").trim()){
       const id=extract7(c[21]);
       const item={name:c[19],date:date3,time:c[17],type:c[18],area:c[20],id};
       data.gyeonggi.push(item);
@@ -1346,45 +1529,9 @@ function buildStateFromParsed(rowsA, rowsB){
   sortData(data.gangnam);
   sortData(data.gyeonggi);
 
-  data.gangbuk.forEach(v=>{
-    calendarItems.push({
-      name:v.name,
-      id:v.id,
-      date:normalizeScheduleDateToYMD(v.date),
-      time:v.time,
-      type:v.type,
-      areaDetail:v.area,
-      areaLabel:"강북",
-      address:(dbById[v.id]||{}).address||"",
-      source:"A"
-    });
-  });
-  data.gangnam.forEach(v=>{
-    calendarItems.push({
-      name:v.name,
-      id:v.id,
-      date:normalizeScheduleDateToYMD(v.date),
-      time:v.time,
-      type:v.type,
-      areaDetail:v.area,
-      areaLabel:"강남",
-      address:(dbById[v.id]||{}).address||"",
-      source:"A"
-    });
-  });
-  data.gyeonggi.forEach(v=>{
-    calendarItems.push({
-      name:v.name,
-      id:v.id,
-      date:normalizeScheduleDateToYMD(v.date),
-      time:v.time,
-      type:v.type,
-      areaDetail:v.area,
-      areaLabel:"경기",
-      address:(dbById[v.id]||{}).address||"",
-      source:"A"
-    });
-  });
+  pushCalendarItemFromArea("gangbuk","강북");
+  pushCalendarItemFromArea("gangnam","강남");
+  pushCalendarItemFromArea("gyeonggi","경기");
 
   for(const row of dbRows){
     const extraDate=normalizeScheduleDateToYMD(row.AJ);
@@ -1403,7 +1550,7 @@ function buildStateFromParsed(rowsA, rowsB){
     });
   }
 
-  calendarItems=sortItemsByDateTime(calendarItems.filter(v=>/^\d{4}-\d{2}-\d{2}$/.test(v.date)));
+  calendarItems=sortItemsByDateTime(calendarItems);
   buildCalendarCounts();
 
   if(!selectedDate) selectedDate=todayYMD();
@@ -1440,28 +1587,27 @@ async function loadAllData(){
 }
 
 function showArea(area){
+  clearSearchUI();
   currentArea=area;
   currentMode="area";
   updateButtons();
-  $suggest.style.display="none";
   renderArea();
   $listWrap.scrollTop=0;
 }
 
 function showCalendarMode(mode){
+  clearSearchUI();
   currentMode = mode;
 
   if(mode==="month"){
     selectedDate = baseWorkdayYMD();
     updateButtons();
-    $suggest.style.display="none";
     renderMonthView(true);
   }
 
   if(mode==="day"){
     selectedDate = baseWorkdayYMD();
     updateButtons();
-    $suggest.style.display="none";
     renderDayView(false);
   }
 
@@ -1469,6 +1615,7 @@ function showCalendarMode(mode){
 }
 
 function goToday(){
+  clearSearchUI();
   selectedDate = baseWorkdayYMD();
 
   if(currentMode==="month"){
@@ -1483,8 +1630,7 @@ function goToday(){
 }
 
 function reloadData(){
-  $suggest.innerHTML="";
-  $suggest.style.display="none";
+  clearSearchUI();
   loadAllData();
 }
 
