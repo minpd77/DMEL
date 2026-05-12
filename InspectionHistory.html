@@ -629,7 +629,7 @@ function dateToYMD(date){
 }
 
 function ymdToDate(ymd){
-  const m=String(ymd||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const m=String(ymd||"").match(/^(\d{})-(\d{2})-(\d{2})$/);
   if(!m) return null;
   return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
 }
@@ -703,10 +703,60 @@ function isExpired(v){
   return /^\d{8}$/.test(d) && d<todayYMD().replace(/-/g,"");
 }
 
+function excelSerialToDate(serial){
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400;
+  const date_info = new Date(utc_value * 1000);
+
+  const fractional_day = serial - Math.floor(serial) + 0.0000001;
+
+  let total_seconds = Math.floor(86400 * fractional_day);
+
+  const seconds = total_seconds % 60;
+  total_seconds -= seconds;
+
+  const hours = Math.floor(total_seconds / (60 * 60));
+  const minutes = Math.floor(total_seconds / 60) % 60;
+
+  return new Date(
+    date_info.getFullYear(),
+    date_info.getMonth(),
+    date_info.getDate(),
+    hours,
+    minutes,
+    seconds
+  );
+}
+
+function normalizeExcelDate(v){
+  if(v===null || v===undefined) return "";
+
+  const s=String(v).trim();
+  if(!s) return "";
+
+  // 이미 YYYY-MM-DD 형식
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+    return s;
+  }
+
+  // 엑셀 시리얼 날짜 처리
+  if(/^\d+(\.\d+)?$/.test(s)){
+    const num=Number(s);
+
+    // 너무 작은 숫자는 제외
+    if(num > 30000 && num < 60000){
+      const d=excelSerialToDate(num);
+      return dateToYMD(d);
+    }
+  }
+
+  const ymd=normalizeScheduleDateToYMD(s);
+  return ymd || s;
+}
+
 function formatDate(v){
   if(!v) return "";
-  const ymd=normalizeScheduleDateToYMD(v);
-  return ymd || String(v).trim();
+  return normalizeExcelDate(v);
 }
 
 function formatShortDate(v){
@@ -949,7 +999,11 @@ function makeBaseCardHtml(item, options={}){
   return `
 <div class="item ${getCardClass(resultValue)}">
   <div class="titleRow">
-    <b>${escapeHtml(item.name)} ${escapeHtml(item.id)}</b>
+<b>
+${escapeHtml(item.name)}
+${escapeHtml(item.id)}
+${db.model ? ` / ${escapeHtml(db.model)}` : ""}
+</b>
     ${resultHtml}
     ${typeChip}
     ${areaBadge}
@@ -1463,14 +1517,15 @@ function buildStateFromParsed(rowsA, rowsB){
       name:c[0]||"",
       id,
       address:c[9]||"",
+model:c[13]||"",
       AI:c[34]||"",
       areaGroup:normalizeAreaLabel(c[8]||""),
       AJ:c[35]||"",
       RESULT:c[36]||"",
       Y:c[26]||"",
-      AA:c[28]||"",
+      AA:normalizeExcelDate(c[28]||""),
       AC:c[30]||"",
-      AF:c[33]||"",
+      AF:normalizeExcelDate(c[33]||""),
       AN:c[39]||""
     };
 
