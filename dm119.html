@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>신고 내용 자동화</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background: #f9f9f9;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 480px;
+      background: #fff;
+      padding: 15px 20px 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgb(0 0 0 / 0.1);
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+
+    .select-box {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 15px;
+      user-select: none;
+      flex-wrap: wrap;
+    }
+
+    .select-box label {
+      cursor: pointer;
+      padding: 8px 12px;
+      border: 2px solid #4caf50;
+      border-radius: 25px;
+      font-weight: 600;
+      color: #4caf50;
+      transition: background-color 0.2s, color 0.2s;
+      font-size: 14px;
+    }
+
+    .select-box input[type="radio"] {
+      display: none;
+    }
+
+    .select-box input[type="radio"]:checked + label {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    #searchBox,
+    #memoBox,
+    #phoneBox {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-weight: 500;
+    }
+
+    textarea {
+      resize: none;
+      min-height: 60px;
+    }
+
+    .suggestions {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      background: #fff;
+      box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
+      font-size: 15px;
+    }
+
+    .suggestion-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+
+    .suggestion-item:hover {
+      background-color: #e6f7ff;
+    }
+
+    #resultBox {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f5f5f5;
+      border: 2px solid #4caf50;
+      border-radius: 8px;
+      font-weight: 600;
+      white-space: pre-wrap;
+      font-size: 1rem;
+    }
+
+    #resultBox.loading {
+      color: #d32f2f;
+      font-weight: 900;
+    }
+
+    #fullAddressWrapper {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1.5px dashed #ccc;
+      background-color: #fdfdfd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: #444;
+      white-space: pre-wrap;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #addressText {
+      flex: 1;
+    }
+
+    .naver-icon {
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      flex: 1;
+      padding: 15px;
+      background: #4caf50;
+      color: white;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.refresh {
+      background: #888;
+    }
+
+    #copyNotice {
+      margin-top: 8px;
+      color: #4caf50;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #copyNotice.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <h2>🔍 신고 내용 자동화</h2>
+
+    <div class="select-box" id="selectBox">
+
+      <input type="radio" name="signal" id="stop" value="정지" />
+      <label for="stop">정지</label>
+
+      <input type="radio" name="signal" id="complain" value="민원" />
+      <label for="complain">민원</label>
+
+      <input type="radio" name="signal" id="trapped" value="승객갇힘" />
+      <label for="trapped">승객갇힘</label>
+
+      <input type="radio" name="signal" id="done" value="조치완료" />
+      <label for="done">조치완료</label>
+
+    </div>
+
+    <input
+      type="text"
+      id="searchBox"
+      placeholder="현장명·승강기번호·주소 일부 입력"
+      autocomplete="off"
+    />
+
+    <div id="suggestions" class="suggestions"></div>
+
+    <label for="memoBox">📌 신고내용</label>
+    <textarea id="memoBox" placeholder="신고내용 기입"></textarea>
+
+    <label for="phoneBox">📞 연락처</label>
+    <input
+      type="text"
+      id="phoneBox"
+      placeholder="신고자 연락처 기입"
+    />
+
+    <div id="resultBox" class="loading">
+      데이터를 불러오는 중...
+    </div>
+
+    <div id="fullAddressWrapper">
+      <span id="addressText"></span>
+
+      <img
+        id="naverIcon"
+        class="naver-icon"
+        src="https://www.darun.io/_next/image?url=https%3A%2F%2Fres.cloudinary.com%2Fdqddtkvmb%2Fimage%2Fupload%2Fv1715433300%2Fimages%2Flogos%2Fnavermap.png&w=256&q=75"
+        alt="네이버지도"
+        title="네이버 지도에서 열기"
+      />
+    </div>
+
+    <div class="btn-group">
+      <button
+        type="button"
+        class="refresh"
+        onclick="resetAll(event)"
+      >
+        🔄 새로고침
+      </button>
+
+      <button
+        type="button"
+        onclick="copyResult()"
+      >
+        📋 복사하기
+      </button>
+    </div>
+
+    <div id="copyNotice"></div>
+
+  </div>
+
+  <script>
+
+    const SHEET_TSV_URL =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkPXudgO_znrjg8-ZyoSmMb5dhrISbANstWt3xNanbbTNCNRhDwAQgxhrECxwN8R2QSV8lTgln6_9P/pub?gid=1374895459&single=true&output=tsv";
+
+
+    let siteData = [];
+    let selectedSite = null;
+
+
+    const searchBox = document.getElementById("searchBox");
+    const memoBox = document.getElementById("memoBox");
+    const phoneBox = document.getElementById("phoneBox");
+    const suggestionsDiv = document.getElementById("suggestions");
+    const resultBox = document.getElementById("resultBox");
+    const addressText = document.getElementById("addressText");
+    const selectBox = document.getElementById("selectBox");
+    const copyNotice = document.getElementById("copyNotice");
+    const naverIcon = document.getElementById("naverIcon");
+
+
+    // =========================================================
+    // 구글시트 데이터 불러오기
+    // =========================================================
+
+    async function loadSiteData() {
+
+      const response = await fetch(SHEET_TSV_URL);
+
+      const tsvText = await response.text();
+
+      const rows = tsvText
+        .trim()
+        .split("\n")
+        .map((r) => r.split("\t"));
+
+
+      return rows.slice(1).map((r) => ({
+
+        // A열
+        siteName: (r[0] || "").trim(),
+
+        // B열
+        zone: (r[1] || "").trim(),
+
+        // C열
+        address: (r[2] || "").trim(),
+
+        // D열
+        elevator: normalizeElevatorNumber(r[3] || ""),
+
+        // G열
+        extra: (r[6] || "").trim(),
+
+        // K열
+        jibunAddress: (r[10] || "").trim(),
+
+        // =====================================================
+        // ⭐ M열 추가
+        // A=0, B=1 ... M=12
+        // =====================================================
+        mValue: (r[12] || "").trim()
+
+      }));
+
+    }
+
+
+    // =========================================================
+    // 승강기 번호 정리
+    // =========================================================
+
+    function normalizeElevatorNumber(input) {
+
+      const digits = input.replace(/\D/g, "");
+
+      if (!digits) return "";
+
+      return digits
+        .padStart(7, "0")
+        .replace(/^(\d{4})(\d{3})$/, "$1-$2");
+
+    }
+
+
+    // =========================================================
+    // 검색어 정리
+    // =========================================================
+
+    function normalize(str) {
+
+      return (str || "")
+        .toLowerCase()
+        .replace(/[\s-]+/g, "");
+
+    }
+
+
+    // =========================================================
+    // 시/도 제거
+    // =========================================================
+
+    function removeProvince(addr) {
+
+      const provinces = [
+        "서울특별시",
+        "서울시",
+        "경기도",
+        "인천광역시",
+        "부산광역시",
+        "대구광역시",
+        "광주광역시",
+        "대전광역시",
+        "울산광역시",
+        "세종특별자치시",
+        "강원도",
+        "충청북도",
+        "충청남도",
+        "전라북도",
+        "전라남도",
+        "경상북도",
+        "경상남도",
+        "제주특별자치도"
+      ];
+
+      for (const prov of provinces) {
+
+        if (addr.startsWith(prov)) {
+          return addr.slice(prov.length);
+        }
+
+      }
+
+      return addr;
+
+    }
+
+
+    function normalizeSearchTerm(term) {
+
+      return normalize(removeProvince(term));
+
+    }
+
+
+    function normalizeAddress(addr) {
+
+      return normalize(removeProvince(addr));
+
+    }
+
+
+    // =========================================================
+    // 주소를 구/시까지만 줄이기
+    // =========================================================
+
+    function shortenAddress(addr) {
+
+      const guMatch = addr.match(/[가-힣]{1,6}구/);
+
+      if (guMatch) {
+        return guMatch[0];
+      }
+
+      const siMatch = addr.match(/[가-힣]{1,6}시/);
+
+      if (siMatch) {
+        return siMatch[0];
+      }
+
+      return addr;
+
+    }
+
+
+    // =========================================================
+    // 페이지 로딩
+    // =========================================================
+
+    window.addEventListener("DOMContentLoaded", async () => {
+
+      resultBox.textContent = "데이터를 불러오는 중...";
+
+      try {
+
+        siteData = await loadSiteData();
+
+        resultBox.textContent = siteData.length
+          ? "현장명·승강기번호·주소를 검색하세요."
+          : "❌ 데이터를 불러올 수 없습니다.";
+
+      } catch (error) {
+
+        console.error(error);
+
+        resultBox.textContent =
+          "❌ 데이터를 불러오는 중 오류가 발생했습니다.";
+
+      }
+
+      resultBox.classList.remove("loading");
+
+    });
+
+
+    // =========================================================
+    // 검색
+    // =========================================================
+
+    searchBox.addEventListener("input", function () {
+
+      const term = normalizeSearchTerm(this.value);
+
+      suggestionsDiv.innerHTML = "";
+
+      selectedSite = null;
+
+
+      if (term.length < 2) {
+
+        updateResult();
+
+        return;
+
+      }
+
+
+      siteData
+        .filter(item =>
+
+          normalize(item.siteName).includes(term) ||
+
+          normalizeAddress(item.address).includes(term) ||
+
+          normalizeAddress(item.jibunAddress).includes(term) ||
+
+          normalize(item.elevator).includes(term)
+
+        )
+        .slice(0, 20)
+        .forEach(item => {
+
+          const div = document.createElement("div");
+
+          div.className = "suggestion-item";
+
+          div.textContent =
+            `${item.siteName} | ${item.elevator} | ${shortenAddress(item.address)}`;
+
+
+          div.onclick = () => {
+
+            selectedSite = item;
+
+            searchBox.value = item.siteName;
+
+            suggestionsDiv.innerHTML = "";
+
+            updateResult();
+
+          };
+
+
+          suggestionsDiv.appendChild(div);
+
+        });
+
+
+      updateResult();
+
+    });
+
+
+    // =========================================================
+    // 입력값 변경 시 결과 업데이트
+    // =========================================================
+
+    memoBox.addEventListener("input", updateResult);
+
+    phoneBox.addEventListener("input", updateResult);
+
+
+    // =========================================================
+    // 신고 유형 선택
+    // =========================================================
+
+    selectBox.addEventListener("click", (e) => {
+
+      if (
+        e.target.tagName === "INPUT" &&
+        e.target.type === "radio"
+      ) {
+
+        if (e.target.wasChecked) {
+
+          e.target.checked = false;
+
+          e.target.wasChecked = false;
+
+        } else {
+
+          e.target.wasChecked = true;
+
+          [
+            ...selectBox.querySelectorAll(
+              'input[type="radio"]'
+            )
+          ]
+            .filter((r) => r !== e.target)
+            .forEach((r) => {
+              r.wasChecked = false;
+            });
+
+        }
+
+        updateResult();
+
+      }
+
+    });
+
+
+    // =========================================================
+    // 결과 생성
+    // =========================================================
+
+    function updateResult() {
+
+      if (!selectedSite) {
+
+        resultBox.textContent = "현장을 선택하세요.";
+
+        addressText.textContent = "";
+
+        return;
+
+      }
+
+
+      const selectedSignal =
+        selectBox.querySelector(
+          'input[name="signal"]:checked'
+        );
+
+
+      const signalValue =
+        selectedSignal
+          ? selectedSignal.value
+          : "";
+
+
+      const signalText =
+        signalValue
+          ? `[${signalValue}] `
+          : "";
+
+
+      const siteName =
+        selectedSite.siteName;
+
+
+      const elevator =
+        selectedSite.elevator.replace("-", "");
+
+
+      const modelInfo =
+        selectedSite.extra || "";
+
+
+      const phone =
+        phoneBox.value.trim();
+
+
+      const memo =
+        memoBox.value.trim();
+
+
+      // 기존 주소는 "광진구"까지만 표시
+      const addrInfo =
+        shortenAddress(selectedSite.address);
+
+
+      // =====================================================
+      // ⭐ M열 값 가져오기
+      // 예:
+      // addrInfo = 광진구
+      // mValue   = 경기본사
+      //
+      // 결과:
+      // 광진구 경기본사
+      // =====================================================
+
+      const mValue =
+        selectedSite.mValue || "";
+
+
+      const addrInfoWithM =
+        `${addrInfo}${mValue ? " " + mValue : ""}`;
+
+
+      let formatted = "";
+
+
+      // =====================================================
+      // 조치완료
+      // =====================================================
+
+      if (signalValue === "조치완료") {
+
+        formatted =
+          `${signalText}${siteName} ${elevator}` +
+          `${modelInfo ? " " + modelInfo : ""}` +
+          `${memo ? "\n" + memo : ""}`;
+
+      }
+
+
+      // =====================================================
+      // 일반 신고
+      // =====================================================
+
+      else {
+
+        formatted =
+          `${signalText}${siteName} ${elevator}` +
+          `${phone ? "\n" + phone : ""}` +
+          `\n${addrInfoWithM}` +
+          `${memo ? "\n\n" + memo : ""}` +
+          `${modelInfo ? "\n" + modelInfo : ""}`;
+
+      }
+
+
+      resultBox.textContent = formatted;
+
+
+      // 아래쪽에는 기존처럼 전체 주소 표시
+      addressText.textContent =
+        `${selectedSite.address}\n${selectedSite.jibunAddress}`;
+
+    }
+
+
+    // =========================================================
+    // 네이버 지도
+    // =========================================================
+
+    naverIcon.addEventListener("click", () => {
+
+      if (!selectedSite) return;
+
+
+      const addr =
+        encodeURIComponent(selectedSite.address);
+
+
+      const isMobile =
+        /iPhone|iPad|iPod|Android/i.test(
+          navigator.userAgent
+        );
+
+
+      if (isMobile) {
+
+        const appUrl =
+          `nmap://search?query=${addr}`;
+
+        window.location.href = appUrl;
+
+      } else {
+
+        window.open(
+          `https://map.naver.com/v5/search/${addr}`,
+          "_blank"
+        );
+
+      }
+
+    });
+
+
+    // =========================================================
+    // 복사
+    // =========================================================
+
+    function copyResult() {
+
+      const text =
+        resultBox.textContent.trim();
+
+
+      if (
+        !text ||
+        text.includes("현장을 선택") ||
+        text.includes("데이터를 불러오는 중")
+      ) {
+        return;
+      }
+
+
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+
+          copyNotice.textContent =
+            "📋 복사 완료!";
+
+          copyNotice.classList.add("visible");
+
+
+          setTimeout(
+            () => copyNotice.classList.remove("visible"),
+            2500
+          );
+
+        });
+
+    }
+
+
+    // =========================================================
+    // 전체 초기화
+    // =========================================================
+
+    function resetAll(e) {
+
+      if (e) {
+        e.preventDefault();
+      }
+
+
+      [
+        ...selectBox.querySelectorAll(
+          'input[type="radio"]'
+        )
+      ].forEach(r => {
+
+        r.checked = false;
+
+        r.wasChecked = false;
+
+      });
+
+
+      searchBox.value = "";
+
+      memoBox.value = "";
+
+      phoneBox.value = "";
+
+      selectedSite = null;
+
+      suggestionsDiv.innerHTML = "";
+
+      copyNotice.textContent = "";
+
+      addressText.textContent = "";
+
+      updateResult();
+
+    }
+
+  </script>
+</body>
+</html>
